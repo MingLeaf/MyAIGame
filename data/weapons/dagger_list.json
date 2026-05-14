@@ -1,0 +1,33 @@
+{
+    "weapon_type": "dagger",
+    "weapons": [
+        {
+            "id": "shadow_dagger",
+            "display_name": "暗影匕首",
+            "color": [180, 60, 80],
+            "base_light_dmg": 7,
+            "base_heavy_dmg": 18,
+            "element": "physical",
+            "stamina": {"light": 8.0, "heavy": 20.0},
+            "knockback": {"light": 100.0, "heavy": 180.0},
+            "bleed_stack_light": 40.0,
+            "poison_stack_light": 15.0,
+            "rarity": "common",
+            "description": "刺客最爱的快剑，背刺伤害极高。"
+        },
+        {
+            "id": "venom_fang",
+            "display_name": "毒牙",
+            "color": [160, 200, 80],
+            "base_light_dmg": 6,
+            "base_heavy_dmg": 16,
+            "element": "poison",
+            "stamina": {"light": 7.0, "heavy": 18.0},
+            "knockback": {"light": 90.0, "heavy": 160.0},
+            "bleed_stack_light": 25.0,
+            "poison_stack_light": 60.0,
+            "rarity": "rare",
+            "description": "刀身渗着腐沼毒液。"
+        }
+    ]
+}

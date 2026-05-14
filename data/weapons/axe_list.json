@@ -1,0 +1,35 @@
+{
+    "weapon_type": "axe",
+    "weapons": [
+        {
+            "id": "battle_axe",
+            "display_name": "破阵战斧",
+            "color": [200, 130, 80],
+            "base_light_dmg": 15,
+            "base_heavy_dmg": 35,
+            "element": "physical",
+            "stamina": {"light": 18.0, "heavy": 38.0},
+            "knockback": {"light": 220.0, "heavy": 380.0},
+            "bleed_stack_light": 20.0,
+            "armor_pierce_light": 0.05,
+            "armor_pierce_heavy": 0.10,
+            "rarity": "common",
+            "description": "厚重斧刃，对持盾敌人格外致命。"
+        },
+        {
+            "id": "berserker_axe",
+            "display_name": "狂战之斧",
+            "color": [180, 80, 60],
+            "base_light_dmg": 18,
+            "base_heavy_dmg": 42,
+            "element": "physical",
+            "stamina": {"light": 22.0, "heavy": 44.0},
+            "knockback": {"light": 260.0, "heavy": 440.0},
+            "bleed_stack_light": 35.0,
+            "armor_pierce_light": 0.05,
+            "armor_pierce_heavy": 0.15,
+            "rarity": "rare",
+            "description": "失去理智的狂战士所执，每次挥砍都伴随血雾。"
+        }
+    ]
+}

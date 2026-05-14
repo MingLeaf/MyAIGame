@@ -1,0 +1,38 @@
+{
+  "id": "beast",
+  "display_name": "荒原狼 / 巨型熊怪",
+  "category": "beast",
+  "comment": "野兽类：高移速，连续撕咬，易触发流血。",
+
+  "render": {
+    "width":  30,
+    "height": 36,
+    "color":  [140, 90, 40]
+  },
+
+  "stats": {
+    "max_hp":   80,
+    "atk":      14,
+    "defense":  1,
+    "speed":    150.0,
+
+    "sight_range":   220.0,
+    "lose_range":    300.0,
+    "attack_range":  32.0,
+    "patrol_radius": 96.0,
+
+    "alert_threshold": 0.3,
+    "alert_speed":     2.5,
+    "alert_decay":     0.7,
+
+    "element_tags": ["beast"],
+    "weaknesses":   ["fire"],
+    "resistances":  ["physical"],
+    "immunities":   [],
+
+    "max_poise":       15.0,
+    "bleed_threshold": 60.0
+  },
+
+  "loot_table": "beast_basic"
+}

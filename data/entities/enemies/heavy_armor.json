@@ -1,0 +1,38 @@
+{
+  "id": "heavy_armor",
+  "display_name": "石像骑士 / 铁甲卫兵",
+  "category": "heavy_armor",
+  "comment": "重甲兵：高防御高韧性，攻击慢但击退力强，流血/毒难以触发。",
+
+  "render": {
+    "width":  32,
+    "height": 56,
+    "color":  [100, 110, 130]
+  },
+
+  "stats": {
+    "max_hp":   150,
+    "atk":      22,
+    "defense":  12,
+    "speed":    55.0,
+
+    "sight_range":   140.0,
+    "lose_range":    200.0,
+    "attack_range":  44.0,
+    "patrol_radius": 40.0,
+
+    "alert_threshold": 0.6,
+    "alert_speed":     1.4,
+    "alert_decay":     0.4,
+
+    "element_tags": ["human", "construct"],
+    "weaknesses":   ["lightning"],
+    "resistances":  ["physical", "fire"],
+    "immunities":   ["poison"],
+
+    "max_poise":       100.0,
+    "bleed_threshold": 150.0
+  },
+
+  "loot_table": "heavy_armor_basic"
+}

@@ -1,0 +1,29 @@
+{
+    "weapon_type": "holy_tome",
+    "weapons": [
+        {
+            "id": "holy_tome",
+            "display_name": "神圣典籍",
+            "color": [255, 240, 120],
+            "base_light_dmg": 12,
+            "base_heavy_dmg": 28,
+            "element": "holy",
+            "stamina": {"light": 14.0, "heavy": 32.0},
+            "knockback": {"light": 160.0, "heavy": 300.0},
+            "rarity": "rare",
+            "description": "记载圣言的经典，对不死生物伤害提升 50%。"
+        },
+        {
+            "id": "judgement_tome",
+            "display_name": "审判圣典",
+            "color": [255, 220, 100],
+            "base_light_dmg": 14,
+            "base_heavy_dmg": 32,
+            "element": "holy",
+            "stamina": {"light": 16.0, "heavy": 36.0},
+            "knockback": {"light": 180.0, "heavy": 320.0},
+            "rarity": "legendary",
+            "description": "执行神之审判的典籍，威能远胜寻常圣典。"
+        }
+    ]
+}

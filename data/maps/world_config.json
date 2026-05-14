@@ -1,0 +1,40 @@
+{
+  "start_area": "area_graveyard",
+  "areas": [
+    {
+      "id": "area_graveyard",
+      "name": "古墓地带",
+      "description": "荒野中的古老墓地，腐骨公爵盘踞于此",
+      "boss": "duke_rotbone",
+      "unlocks": ["area_swamp"]
+    },
+    {
+      "id": "area_swamp",
+      "name": "毒沼泽地",
+      "description": "弥漫毒雾的沼泽，沼泽女巫统治的领地",
+      "boss": "witch_mora",
+      "unlocks": ["area_ironmine"]
+    },
+    {
+      "id": "area_ironmine",
+      "name": "铁山矿场",
+      "description": "锤声震天的矿山，锤神伯格的据点",
+      "boss": "lord_berg",
+      "unlocks": ["area_darkforest"]
+    },
+    {
+      "id": "area_darkforest",
+      "name": "黑暗森林",
+      "description": "永夜的古老森林，幽魂艾拉出没之处",
+      "boss": "assassin_ella",
+      "unlocks": ["area_castle"]
+    },
+    {
+      "id": "area_castle",
+      "name": "堕落王城",
+      "description": "昔日辉煌今已腐化的王城，堕落龙的巢穴",
+      "boss": "dragon_aegnis",
+      "unlocks": []
+    }
+  ]
+}

@@ -1,0 +1,361 @@
+我来整理项目现状，输出 5 个可独立使用的上下文提示词，每个负责不同模块，接口设计保持一致。
+
+---
+
+## 📋 提示词 1：敌人 AI 系统（第四阶段）
+
+```
+你是我的编程助手，我们正在用 Python + Pygame 2.6 开发一款 2.5D 类魂 RPG《烬土传说》（Ashland Legend）。
+运行环境：Python 3.8，Windows，项目根目录 d:\Project\MyAIGame。
+
+════════ 已完成的工作 ════════
+
+【项目结构】
+core/         game.py / camera.py / input_handler.py / scene_manager.py / renderer.py / event_manager.py
+physics/      gravity.py / movement_resolver.py / collision_detector.py
+map/          tile.py / tile_map.py / collision_map.py / area.py / world_map.py / campfire.py / transition_gate.py
+entities/     base_entity.py
+entities/player/  player.py / player_stats.py / player_states.py / attack_hitbox.py
+ui/           font_manager.py / hud.py
+scenes/       main_menu_scene.py / game_scene.py / pause_scene.py
+utils/        state_machine.py / color.py / timer.py / math_utils.py / debug.py
+data/maps/area_graveyard/tilemap.json
+config.py
+
+【物理系统】
+- GravitySystem：gravity=900, max_fall=1200, jump_force=-480
+- MovementResolver：轴分离碰撞，含2px地面探针，单向平台穿透
+- tile_size = 32px
+
+【玩家系统（entities/player/player.py）】
+- 尺寸：24×48px
+- 速度：240px/s
+- 状态机：Idle / Run / Jump / Fall / Roll / LightAttack1~3 / HeavyAttack / Hurt / Dead
+- PlayerStats：HP=100, Stamina=100, Mana=50，耐力自动恢复30/s
+- AttackHitbox：轻攻击18/22/30伤害，重攻击55伤害
+- 接口：player.take_damage(amount, knockback_dir)
+- 键位：A/D移动，Space跳跃，Shift翻滚，J轻攻，K重攻
+
+【碰撞地图接口（map/collision_map.py）】
+- get_solid_tiles_in_rect(rect) -> List[pygame.Rect]
+- get_platform_tiles_in_rect(rect) -> List[pygame.Rect]
+
+【事件系统（core/event_manager.py）】
+- event_manager.emit("事件名", data_dict)
+- event_manager.on("事件名", callback)
+
+【字体】所有中文文字必须使用 from ui.font_manager import get_font
+
+════════ 本窗口的任务 ════════
+
+实现敌人 AI 系统，新建以下文件：
+
+entities/enemy/
+  __init__.py
+  base_enemy.py      —— 敌人基类（继承 BaseEntity，含重力/碰撞/状态机）
+  enemy_stats.py     —— 敌人数值（HP/ATK/DEF/速度/视野）
+  enemy_states.py    —— 状态：Idle(巡逻) / Chase(追击) / Attack(攻击) / Hurt / Dead
+  infantry.py        —— 普通士兵敌人
+  undead.py          —— 不死族敌人（比士兵更耐打，行动慢）
+
+【设计要求】
+1. 巡逻：在出生点左右各64px范围内往返
+2. 追击：玩家进入视野(180px)且同屏时切换，离开视野(240px)后放弃追击
+3. 攻击：玩家在攻击范围(36px)内，前摇8帧→判定6帧→后摇10帧，伤害12
+4. 受击：take_damage(amount, knockback_dir)接口，触发硬直0.4s
+5. 死亡：倒地0.8s后设 self.dead=True，发布 event_manager.emit("enemy_dead", {"enemy": self})
+6. 渲染：无素材时用颜色矩形占位（士兵绿色、不死族紫色）
+7. 需要与 MovementResolver / GravitySystem 集成（和玩家一样受重力）
+
+在 game_scene.py 的 update() 和 render() 中集成敌人更新和渲染（敌人列表从 area 中读取）。
+```
+
+---
+
+## 📋 提示词 2：战斗伤害系统（第五阶段）
+
+```
+你是我的编程助手，我们正在用 Python + Pygame 2.6 开发一款 2.5D 类魂 RPG《烬土传说》（Ashland Legend）。
+运行环境：Python 3.8，Windows，项目根目录 d:\Project\MyAIGame。
+
+════════ 已完成的工作 ════════
+
+【玩家攻击系统】
+entities/player/attack_hitbox.py：
+  AttackHitbox(owner_rect, facing, offset_x, offset_y, width, height,
+               damage, active_frames, knockback=180.0, stamina_damage=20.0)
+  - hb.rect：世界坐标判定矩形
+  - hb.active：是否存活
+  - hb.can_hit(target_id) / hb.register_hit(target_id)：防多次命中
+  - player.active_hitboxes：当前帧所有活跃判定框
+
+【玩家数值接口】
+  player.stats.hp / max_hp / hp_ratio
+  player.stats.take_damage(amount) -> 实际扣血量
+  player.take_damage(amount, knockback_dir)  # 带硬直的受击
+  player.invincible：翻滚无敌帧
+
+【伤害公式（game_rule.md）】
+  最终伤害 = (攻击力 × 技能倍率) - (防御值 × 防御系数)
+  弱点伤害 × 1.5，元素克制 × 1.3，神圣克制不死 × 1.5
+  格挡减伤 30%~80%
+
+【状态异常（game_rule.md）】
+  流血：累积值达阈值 → 爆发扣当前HP的15%
+  中毒：持续扣血30s
+  燃烧：持续扣血+降防御，可翻滚消除
+  冰冻：硬直2s+额外20%伤害
+  诅咒：最大HP减半
+  眩晕：韧性被打空，可被处决
+
+════════ 本窗口的任务 ════════
+
+实现战斗伤害处理系统，新建以下文件：
+
+combat/
+  __init__.py
+  damage_calculator.py   —— 伤害计算器
+  hit_resolver.py        —— 判定框碰撞检测（每帧扫描 hitbox vs 敌人）
+  status_effect.py       —— 状态异常基类 + 各种异常实现
+  status_manager.py      —— 挂载在实体上，管理当前所有异常
+  floating_text.py       —— 伤害飘字（数字从命中点浮起，1s后消失）
+
+【具体要求】
+1. DamageCalculator.calculate(attacker_stats, defender_stats, hit_info) -> final_damage
+   hit_info 包含：base_damage, skill_multiplier, element, is_backstab, is_blocked
+2. HitResolver.update(player, enemy_list) 每帧调用：
+   遍历 player.active_hitboxes，检测与各敌人 rect 的碰撞
+   命中后：调用 enemy.take_damage()，生成飘字，播放音效事件
+3. StatusEffect 基类：update(dt, owner) / apply(owner) / remove(owner) / duration
+   实现：BleedEffect / PoisonEffect / BurnEffect / FreezeEffect
+4. FloatingText：命中点世界坐标 → 屏幕坐标，向上飘 40px，fade out
+   在 game_scene.render() 中调用 floating_text_manager.render(surface, cam_offset)
+5. 所有中文用 from ui.font_manager import get_font
+
+在 game_scene.py 中集成：
+  self._hit_resolver = HitResolver()
+  self._floating_texts = FloatingTextManager()
+  update() 中调用 hit_resolver.update(player, enemies)
+```
+
+---
+
+## 📋 提示词 3：物品与背包系统（第六阶段）
+
+```
+你是我的编程助手，我们正在用 Python + Pygame 2.6 开发一款 2.5D 类魂 RPG《烬土传说》（Ashland Legend）。
+运行环境：Python 3.8，Windows，项目根目录 d:\Project\MyAIGame。
+
+════════ 已完成的工作 ════════
+
+【玩家数值系统（entities/player/player_stats.py）】
+  max_hp=100, hp=100
+  max_stamina=100.0, stamina=100.0（自动恢复30/s，延迟1.2s）
+  max_mana=50, mana=50
+  consume_stamina(amount) -> bool
+  consume_mana(amount) -> bool
+  restore_mana(amount)
+  heal(amount) -> int
+
+【成长属性（game_rule.md §2.2）】
+  力量(Strength) / 敏捷(Dexterity) / 智慧(Intelligence)
+  信仰(Faith) / 体魄(Vitality) / 耐性(Endurance)
+  
+【装备系统设计（game_rule.md §2.3）】
+  翻滚类型由负重率决定：<30%快滚 / 30~70%中滚 / >70%慢滚 / >100%无法翻滚
+  物理攻击力 = 武器基础攻击 + 力量/敏捷加成
+  
+【事件系统】
+  event_manager.emit / event_manager.on
+  
+【字体】from ui.font_manager import get_font（中文必须使用）
+
+════════ 本窗口的任务 ════════
+
+实现物品、装备和背包系统，新建以下文件：
+
+items/
+  __init__.py
+  item_base.py          —— 物品基类（id/name/description/icon_id/weight/stackable）
+  weapon.py             —— 武器（base_atk/str_scale/dex_scale/weapon_art）
+  armor.py              —— 护甲（各部位：head/chest/hands/legs，提供DEF/poise）
+  consumable.py         —— 消耗品（estus_flask回血，蓝瓶回蓝，解毒药水等）
+  item_database.py      —— 所有物品的静态注册表（id -> Item实例）
+
+player/
+  inventory.py          —— 背包（最多30格，可叠加消耗品）
+  equipment.py          —— 装备栏（武器/盾/头/胸/手/腿 6个槽位）
+  player_build.py       —— 玩家Build（6项成长属性点数 + 等级 + 计算衍生属性）
+
+ui/
+  inventory_screen.py   —— 背包界面（网格布局，鼠标悬停显示详情，可装备/使用/丢弃）
+  equipment_screen.py   —— 装备界面（展示人形6槽位 + 当前属性面板）
+
+【具体要求】
+1. PlayerBuild.compute_stats() 根据成长属性重新计算 player_stats（max_hp/max_stamina/攻击力等）
+2. Equipment.equip(slot, item) 更新负重率，联动 player_states.py 中 RollState 的翻滚速度
+3. Consumable.use(player) 直接调用 player.stats.heal() / restore_mana() 等
+4. InventoryScreen：按 I 键打开/关闭，暂停游戏时间（不调用 update）
+5. 背包/装备界面所有文字中文使用 get_font()
+```
+
+---
+
+## 📋 提示词 4：音效与粒子系统（第七阶段）
+
+```
+你是我的编程助手，我们正在用 Python + Pygame 2.6 开发一款 2.5D 类魂 RPG《烬土传说》（Ashland Legend）。
+运行环境：Python 3.8，Windows，项目根目录 d:\Project\MyAIGame。
+
+════════ 已完成的工作 ════════
+
+【场景结构】
+  scenes/game_scene.py：主游戏场景，update(dt) / render(renderer) 每帧调用
+  
+【事件系统】
+  event_manager.emit("事件名", data) / event_manager.on("事件名", callback)
+  已有事件：
+    "campfire_activated" {"campfire_id", "x", "y"}
+    "enemy_dead"         {"enemy": enemy_obj}
+    "player_dead"        {}
+
+【玩家状态机（entities/player/player_states.py）】
+  状态：Idle / Run / Jump / Fall / Roll / LightAttack1~3 / HeavyAttack / Hurt / Dead
+  
+【地图 tile_size = 32px，屏幕 1280×720】
+
+【资源目录约定】
+  assets/audio/bgm/     背景音乐 .ogg
+  assets/audio/sfx/     音效 .wav / .ogg
+  assets/particles/     粒子素材（可无素材，用颜色模拟）
+
+════════ 本窗口的任务 ════════
+
+实现音效管理器和粒子系统，新建以下文件：
+
+core/
+  audio_manager.py     —— 音效/BGM 统一管理器（单例）
+
+effects/
+  __init__.py
+  particle.py          —— 单个粒子（位置/速度/生命/颜色/尺寸）
+  particle_emitter.py  —— 粒子发射器（一次性爆发 or 持续发射）
+  particle_manager.py  —— 全局粒子管理器（update/render，挂在 game_scene）
+  emitter_presets.py   —— 预设发射器：
+      hit_spark()       攻击命中火花（橙黄色，6~10粒，向四周扩散）
+      land_dust()       落地尘土（灰色，4~6粒，向两侧扩散）
+      roll_dust()       翻滚残影（蓝白，沿翻滚路径留下）
+      campfire_spark()  篝火火花（暖色，持续向上飘）
+      death_burst()     死亡爆碎（深红，向四周爆发）
+
+【AudioManager 要求】
+  load_bgm(name, path) / play_bgm(name, loop=True, fade_ms=1000)
+  load_sfx(name, path) / play_sfx(name, volume=1.0)
+  set_bgm_volume(v) / set_sfx_volume(v)
+  若音频文件不存在则静默忽略（不报错）
+  
+  需要监听事件自动播放音效：
+    玩家攻击命中    → sfx "hit"
+    玩家受伤        → sfx "hurt"
+    玩家死亡        → sfx "player_die"
+    跳跃            → sfx "jump"
+    落地            → sfx "land"
+    翻滚            → sfx "roll"
+    篝火激活        → sfx "campfire"
+    敌人死亡        → sfx "enemy_die"
+
+【粒子系统要求】
+  Particle：world 坐标，受简单重力影响，fade out 消失
+  ParticleManager.spawn(preset_func, world_x, world_y)
+  ParticleManager.render(surface, cam_offset) 在 game_scene.render() 的第4步后调用
+  
+在 game_scene.py 中集成：
+  self._audio = AudioManager()
+  self._particles = ParticleManager()
+```
+
+---
+
+## 📋 提示词 5：存档、死亡惩罚与游戏循环（第八阶段）
+
+```
+你是我的编程助手，我们正在用 Python + Pygame 2.6 开发一款 2.5D 类魂 RPG《烬土传说》（Ashland Legend）。
+运行环境：Python 3.8，Windows，项目根目录 d:\Project\MyAIGame。
+
+════════ 已完成的工作 ════════
+
+【玩家死亡事件】
+  玩家进入 Dead 状态后 2 秒发布：event_manager.emit("player_dead", {})
+
+【篝火系统（map/campfire.py）】
+  篝火激活：event_manager.emit("campfire_activated", {"campfire_id", "x", "y"})
+  篝火是复活点（类似黑魂篝火）
+
+【地图区域（map/area.py）】
+  area.get_spawn_point() -> (x, y)
+  area_id = "area_graveyard"（目前只有此区域）
+
+【玩家数值（entities/player/player_stats.py）】
+  hp, stamina, mana, max_hp, max_stamina, max_mana
+  heal() / restore_mana()
+  
+【场景管理（core/scene_manager.py）】
+  scene_manager.push(scene) / scene_manager.pop() / scene_manager.replace(scene)
+
+【存档路径约定】
+  save/slots/slot_{n}.json（config.py 中 SAVE_DIR 已定义）
+
+════════ 本窗口的任务 ════════
+
+实现存档系统、死亡流程和游戏循环闭环，新建以下文件：
+
+core/
+  save_manager.py       —— 存档读写（JSON，支持3个存档槽）
+
+scenes/
+  death_scene.py        —— 死亡场景（"你已死亡" 画面，淡入淡出，R键复活）
+  load_game_scene.py    —— 选择存档槽场景（供主菜单"继续游戏"使用）
+
+【SaveManager 存档结构（JSON）】
+{
+  "slot": 1,
+  "save_time": "2026-05-12 18:00:00",
+  "area_id": "area_graveyard",
+  "campfire_id": "cf_graveyard_01",
+  "player": {
+    "level": 1,
+    "hp": 100,  "max_hp": 100,
+    "stamina": 100, "mana": 50,
+    "stats": {"strength":10,"dexterity":10,"intelligence":8,
+              "faith":8,"vitality":10,"endurance":10}
+  },
+  "flags": {}   // 游戏进度标记（boss是否击杀等）
+}
+
+【死亡流程】
+  1. 监听 "player_dead" 事件
+  2. 屏幕逐渐变黑（1秒淡入），显示"你已死亡"（中文，大红字）
+  3. 2秒后显示"按 R 键复活"提示
+  4. 按 R：读取最近存档 → 传送回最后激活的篝火 → 恢复满HP
+  5. 死亡时敌人不重置（只有篝火激活才重置，保留黑魂机制）
+
+【存档触发时机】
+  - 激活篝火时自动存档（监听 "campfire_activated"）
+  - 主菜单"继续游戏"读取存档，跳转到对应区域篝火位置
+
+【字体】所有中文必须使用 from ui.font_manager import get_font
+```
+
+---
+
+## 使用说明
+
+| 提示词 | 负责模块 | 前置依赖 |
+|--------|---------|---------|
+| 提示词 1 | 敌人 AI | 无（可立即开始） |
+| 提示词 2 | 战斗伤害 | 需要提示词 1 的敌人类 |
+| 提示词 3 | 物品背包 | 独立，不依赖 1/2 |
+| 提示词 4 | 音效粒子 | 独立，不依赖 1/2/3 |
+| 提示词 5 | 存档死亡 | 需要提示词 1（敌人）+ 3（存档含装备） |
+
+**并行建议**：提示词 1、3、4 可以同时在三个窗口并行开发，完成后再用提示词 2 和 5 整合。

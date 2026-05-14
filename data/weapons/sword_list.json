@@ -1,0 +1,41 @@
+{
+    "weapon_type": "sword",
+    "weapons": [
+        {
+            "id": "knight_sword",
+            "display_name": "骑士剑",
+            "color": [180, 180, 220],
+            "base_light_dmg": 10,
+            "base_heavy_dmg": 22,
+            "element": "physical",
+            "stamina": {"light": 12.0, "heavy": 28.0},
+            "knockback": {"light": 160.0, "heavy": 260.0},
+            "rarity": "common",
+            "description": "骑士团制式佩剑，均衡可靠。"
+        },
+        {
+            "id": "ember_blade",
+            "display_name": "余烬之刃",
+            "color": [220, 130, 80],
+            "base_light_dmg": 11,
+            "base_heavy_dmg": 24,
+            "element": "fire",
+            "stamina": {"light": 13.0, "heavy": 30.0},
+            "knockback": {"light": 160.0, "heavy": 260.0},
+            "rarity": "rare",
+            "description": "刀身常年温热的赤焰宝剑，可附带火焰积累。"
+        },
+        {
+            "id": "moonlight_sword",
+            "display_name": "月光剑",
+            "color": [160, 200, 255],
+            "base_light_dmg": 12,
+            "base_heavy_dmg": 26,
+            "element": "arcane",
+            "stamina": {"light": 14.0, "heavy": 32.0},
+            "knockback": {"light": 160.0, "heavy": 280.0},
+            "rarity": "legendary",
+            "description": "传说中映照月光的古剑。"
+        }
+    ]
+}

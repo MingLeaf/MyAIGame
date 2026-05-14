@@ -1,0 +1,167 @@
+{
+  "_comment": "护甲数据。slot 必须是 head/chest/hands/legs。set_id 为空字符串则不属于任何套装。",
+  "armors": [
+    {
+      "item_id": "knight_helm",
+      "name": "骑士头盔",
+      "description": "沉重的全封闭头盔，防御出色。",
+      "slot": "head",
+      "defense": 12,
+      "poise": 10.0,
+      "weight": 4.5,
+      "icon_id": 20,
+      "set_id": "knight"
+    },
+    {
+      "item_id": "knight_chest",
+      "name": "骑士胸甲",
+      "description": "骑士团标准胸甲，厚重坚固。",
+      "slot": "chest",
+      "defense": 22,
+      "poise": 20.0,
+      "weight": 10.0,
+      "icon_id": 21,
+      "set_id": "knight"
+    },
+    {
+      "item_id": "knight_hands",
+      "name": "骑士手甲",
+      "description": "包裹双手的金属护甲。",
+      "slot": "hands",
+      "defense": 8,
+      "poise": 5.0,
+      "weight": 3.0,
+      "icon_id": 22,
+      "set_id": "knight"
+    },
+    {
+      "item_id": "knight_legs",
+      "name": "骑士腿甲",
+      "description": "覆盖双腿的重型护甲。",
+      "slot": "legs",
+      "defense": 15,
+      "poise": 10.0,
+      "weight": 7.0,
+      "icon_id": 23,
+      "set_id": "knight"
+    },
+
+    {
+      "item_id": "ranger_hood",
+      "name": "游侠风帽",
+      "description": "轻便的皮质头盔，几乎不影响翻滚。",
+      "slot": "head",
+      "defense": 4,
+      "poise": 2.0,
+      "weight": 1.5,
+      "icon_id": 24,
+      "set_id": "ranger"
+    },
+    {
+      "item_id": "ranger_vest",
+      "name": "游侠皮甲",
+      "description": "柔韧皮革制成，适合轻装突袭。",
+      "slot": "chest",
+      "defense": 10,
+      "poise": 5.0,
+      "weight": 4.0,
+      "icon_id": 25,
+      "set_id": "ranger"
+    },
+    {
+      "item_id": "ranger_gloves",
+      "name": "游侠手套",
+      "description": "薄革手套，不妨碍弓弦操作。",
+      "slot": "hands",
+      "defense": 3,
+      "poise": 1.0,
+      "weight": 1.0,
+      "icon_id": 26,
+      "set_id": "ranger"
+    },
+    {
+      "item_id": "ranger_boots",
+      "name": "游侠靴",
+      "description": "轻便靴子，移动时几乎无声。",
+      "slot": "legs",
+      "defense": 6,
+      "poise": 2.0,
+      "weight": 2.0,
+      "icon_id": 27,
+      "set_id": "ranger"
+    },
+
+    {
+      "item_id": "mage_hat",
+      "name": "法师锥帽",
+      "description": "施法者的帽子，魔法抗性较高。",
+      "slot": "head",
+      "defense": 2,
+      "poise": 0.0,
+      "magic_res": 15,
+      "weight": 0.8,
+      "icon_id": 28,
+      "set_id": "mage"
+    },
+    {
+      "item_id": "mage_robe",
+      "name": "魔法长袍",
+      "description": "蕴含魔纹的长袍，大幅提升魔法抗性。",
+      "slot": "chest",
+      "defense": 5,
+      "poise": 0.0,
+      "magic_res": 25,
+      "weight": 3.0,
+      "icon_id": 29,
+      "set_id": "mage"
+    },
+    {
+      "item_id": "mage_gloves",
+      "name": "法师手套",
+      "description": "轻薄魔纹手套，施法精度提升。",
+      "slot": "hands",
+      "defense": 1,
+      "poise": 0.0,
+      "magic_res": 10,
+      "weight": 0.5,
+      "icon_id": 30,
+      "set_id": "mage"
+    },
+    {
+      "item_id": "mage_trousers",
+      "name": "法师长裤",
+      "description": "宽松的魔法布料裤子。",
+      "slot": "legs",
+      "defense": 3,
+      "poise": 0.0,
+      "magic_res": 15,
+      "weight": 1.5,
+      "icon_id": 31,
+      "set_id": "mage"
+    }
+  ],
+
+  "set_bonuses": [
+    {
+      "set_id": "knight",
+      "set_name": "骑士套装",
+      "threshold": 4,
+      "bonus": {"poise": 20.0, "def_bonus": 0.10},
+      "description": "凑齐 4 件骑士装：全身韧性 +20，物理减伤 +10%。"
+    },
+    {
+      "set_id": "ranger",
+      "set_name": "游侠套装",
+      "threshold": 4,
+      "bonus": {"stamina_regen": 5.0, "roll_iframes": 0.05},
+      "description": "凑齐 4 件游侠装：耐力恢复速度 +5/秒，翻滚无敌帧 +0.05s。"
+    },
+    {
+      "set_id": "mage",
+      "set_name": "法师套装",
+      "threshold": 4,
+      "bonus": {"mana_max": 30.0, "magic_dmg": 0.15},
+      "description": "凑齐 4 件法师装：灵力上限 +30，魔法伤害 +15%。"
+    }
+  ]
+}

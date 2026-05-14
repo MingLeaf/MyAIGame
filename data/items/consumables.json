@@ -1,0 +1,182 @@
+{
+  "_comment": "消耗品数据。type 字段决定使用哪个子类反射创建。",
+  "consumables": [
+    {
+      "type": "heal_potion",
+      "item_id": "heal_potion_small",
+      "name": "草药汤",
+      "description": "林间草药熬制的暖汤，回复少量生命。",
+      "icon_id": 100,
+      "weight": 0.2,
+      "effect_value": 30,
+      "max_stack": 10
+    },
+    {
+      "type": "heal_potion",
+      "item_id": "heal_potion_large",
+      "name": "高级圣水",
+      "description": "教会祝祷过的圣水，大幅回复生命。",
+      "icon_id": 101,
+      "weight": 0.3,
+      "effect_value": 80,
+      "max_stack": 5
+    },
+
+    {
+      "type": "mana_potion",
+      "item_id": "mana_potion_basic",
+      "name": "灵力药剂",
+      "description": "蔚蓝色液体，回复灵力。",
+      "icon_id": 110,
+      "weight": 0.2,
+      "effect_value": 40,
+      "max_stack": 10
+    },
+
+    {
+      "type": "stamina_potion",
+      "item_id": "stamina_potion_basic",
+      "name": "精力饮剂",
+      "description": "草本香气的提神饮料，迅速恢复精力。",
+      "icon_id": 120,
+      "weight": 0.2,
+      "effect_value": 50,
+      "max_stack": 10
+    },
+
+    {
+      "type": "antidote",
+      "item_id": "antidote_universal",
+      "name": "万能解药",
+      "description": "广谱解药，可清除大部分状态异常。",
+      "icon_id": 130,
+      "weight": 0.1,
+      "max_stack": 10
+    },
+
+    {
+      "type": "buff_item",
+      "item_id": "buff_sharp_powder",
+      "name": "锋刃石粉",
+      "description": "撒于刀刃上短时大幅提升攻击力。",
+      "icon_id": 140,
+      "weight": 0.1,
+      "buff_type": "atk_bonus",
+      "buff_value": 0.15,
+      "buff_duration": 60.0,
+      "max_stack": 10
+    },
+    {
+      "type": "buff_item",
+      "item_id": "buff_holy_oil",
+      "name": "圣油",
+      "description": "涂抹武器附加神圣属性。",
+      "icon_id": 141,
+      "weight": 0.1,
+      "buff_type": "weapon_holy",
+      "buff_value": 10,
+      "buff_duration": 60.0,
+      "max_stack": 10
+    },
+    {
+      "type": "buff_item",
+      "item_id": "buff_flame_resin",
+      "name": "烈焰松脂",
+      "description": "易燃松脂，可使武器附带火焰伤害。",
+      "icon_id": 142,
+      "weight": 0.1,
+      "buff_type": "weapon_fire",
+      "buff_value": 12,
+      "buff_duration": 60.0,
+      "max_stack": 10
+    },
+    {
+      "type": "buff_item",
+      "item_id": "buff_iron_skin",
+      "name": "铁皮膏",
+      "description": "涂抹皮肤，短暂强化防御。",
+      "icon_id": 143,
+      "weight": 0.1,
+      "buff_type": "def_bonus",
+      "buff_value": 0.20,
+      "buff_duration": 60.0,
+      "max_stack": 10
+    },
+    {
+      "type": "buff_item",
+      "item_id": "buff_berserk",
+      "name": "狂战药",
+      "description": "暴怒之药，攻击力大幅提升但防御下降。",
+      "icon_id": 144,
+      "weight": 0.1,
+      "buff_type": "atk_bonus",
+      "buff_value": 0.30,
+      "buff_duration": 30.0,
+      "side_effect": "def_down_0_20",
+      "max_stack": 5
+    },
+
+    {
+      "type": "special_item",
+      "item_id": "curse_remover_charm",
+      "name": "诅咒解符",
+      "description": "古老符咒，可解除诅咒状态。",
+      "icon_id": 150,
+      "weight": 0.1,
+      "special_kind": "curse_remover",
+      "max_stack": 5
+    },
+    {
+      "type": "special_item",
+      "item_id": "skeleton_ashes",
+      "name": "骷髅骨灰",
+      "description": "撒于地面可暂召唤骷髅友军并肩作战。",
+      "icon_id": 151,
+      "weight": 0.1,
+      "special_kind": "skeleton_ashes",
+      "max_stack": 3
+    },
+    {
+      "type": "special_item",
+      "item_id": "teleport_stone",
+      "name": "传送石",
+      "description": "握碎后立刻传送回最近营地。",
+      "icon_id": 152,
+      "weight": 0.2,
+      "special_kind": "teleport_stone",
+      "max_stack": 5
+    },
+    {
+      "type": "special_item",
+      "item_id": "trap_bomb",
+      "name": "陷阱炸弹",
+      "description": "于脚下放置定时炸弹。",
+      "icon_id": 153,
+      "weight": 0.5,
+      "special_kind": "trap_bomb",
+      "extra": {"damage": 80},
+      "max_stack": 5
+    },
+    {
+      "type": "special_item",
+      "item_id": "poison_dart",
+      "name": "毒飞镖",
+      "description": "投掷有毒飞镖，少量伤害但附加剧毒积累。",
+      "icon_id": 154,
+      "weight": 0.05,
+      "special_kind": "poison_dart",
+      "extra": {"damage": 12, "poison_stack": 40},
+      "max_stack": 20
+    },
+
+    {
+      "type": "arrow",
+      "item_id": "arrow",
+      "name": "标准箭矢",
+      "description": "弓的标准弹药。",
+      "icon_id": 160,
+      "weight": 0.05,
+      "max_stack": 99
+    }
+  ]
+}

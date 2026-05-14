@@ -1,0 +1,52 @@
+{
+  "_comment": [
+    "古墓地带敌人配置 v2（与 80 列地图同步）",
+    "",
+    "[难度梯度（从左到右）]",
+    "  A 段 起始营地  (col  1-15)：1 名 infantry，最低强度",
+    "  B 段 废弃工坊  (col 16-30)：infantry + 高位 archer + undead",
+    "  C 段 墓室爬升  (col 31-50)：infantry + beast + 平台 archer + 进阶 undead",
+    "  D 段 地下竞技场(col 51-65)：beast + undead + 高台 mage（首次法师威胁）",
+    "  E 段 出口走廊  (col 66-79)：进阶 infantry + 进阶 undead，模拟门卫",
+    "",
+    "[平台敌人放置]",
+    "  archer  col 24 row 10 → 站在 row 11 平台上（cols 22-26）",
+    "  archer  col 42 row 13 → 站在 row 14 平台上（cols 41-44）",
+    "  mage    col 61 row 13 → 站在 row 14 平台 G 上（cols 60-63）",
+    "",
+    "[备注] y 是瓦片行；spawner 转换为 y * tile_size + tile_size 像素的脚底位置"
+  ],
+
+  "spawns": [
+    { "type": "infantry", "x": 12, "y": 17, "level": 1, "patrol_radius": 64.0,
+      "_note": "[A] 训练步兵：玩家第一名敌人" },
+
+    { "type": "infantry", "x": 19, "y": 17, "level": 1, "patrol_radius": 48.0,
+      "_note": "[B] 步兵守在浅坑后" },
+    { "type": "archer",   "x": 24, "y": 10, "level": 1, "patrol_radius": 32.0,
+      "_note": "[B] 弓箭手站在 row 11 平台 (cols 22-26) 上方俯射" },
+    { "type": "undead",   "x": 29, "y": 17, "level": 1, "patrol_radius": 48.0,
+      "_note": "[B] 不死守卫" },
+
+    { "type": "infantry", "x": 33, "y": 17, "level": 1, "patrol_radius": 56.0,
+      "_note": "[C] 入口步兵" },
+    { "type": "beast",    "x": 36, "y": 17, "level": 1, "patrol_radius": 80.0,
+      "_note": "[C] 野兽（高速冲撞）" },
+    { "type": "archer",   "x": 42, "y": 13, "level": 2, "patrol_radius": 24.0,
+      "_note": "[C] 弓箭手在 row 14 平台 E 上 (cols 41-44)，level 2" },
+    { "type": "undead",   "x": 48, "y": 17, "level": 2, "patrol_radius": 40.0,
+      "_note": "[C] 营地前的进阶不死兵" },
+
+    { "type": "beast",    "x": 53, "y": 17, "level": 2, "patrol_radius": 80.0,
+      "_note": "[D] 进阶野兽" },
+    { "type": "undead",   "x": 58, "y": 17, "level": 2, "patrol_radius": 48.0,
+      "_note": "[D] 进阶不死守卫" },
+    { "type": "mage",     "x": 61, "y": 13, "level": 1, "patrol_radius": 16.0,
+      "_note": "[D] 法师高台吟唱（cols 60-63 平台 G）—— 区段 D 主要威胁" },
+
+    { "type": "infantry", "x": 67, "y": 17, "level": 2, "patrol_radius": 56.0,
+      "_note": "[E] 出口前进阶步兵" },
+    { "type": "undead",   "x": 71, "y": 17, "level": 2, "patrol_radius": 40.0,
+      "_note": "[E] 出口前最后不死守卫" }
+  ]
+}

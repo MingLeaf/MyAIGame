@@ -1,0 +1,41 @@
+{
+    "_meta": {
+        "description": "状态异常数值配置（第 4 阶段·数据驱动）",
+        "_note": "字段对应 combat/status_effect.py 中的类常量"
+    },
+
+    "bleed": {
+        "threshold":     100.0,
+        "burst_ratio":   0.15,
+        "decay_rate":    8.0,
+        "_note":         "积累值达 threshold → 爆发扣当前HP的 15%；每秒衰减 decay_rate"
+    },
+
+    "poison": {
+        "damage_per_sec": 3.0,
+        "duration":       30.0
+    },
+
+    "burn": {
+        "damage_per_sec": 5.0,
+        "defense_penalty": 3,
+        "duration":       8.0,
+        "_note":          "持续掉血并降低防御，可被翻滚消除"
+    },
+
+    "freeze": {
+        "duration":         2.0,
+        "extra_dmg_bonus":  0.20,
+        "_note":            "冰冻期间锁定移动 + 受额外 20% 伤害"
+    },
+
+    "curse": {
+        "duration":  -1,
+        "_note":     "永久减半最大HP，需特殊手段净化"
+    },
+
+    "stun": {
+        "duration": 2.0,
+        "_note":    "韧性归零触发，可被处决"
+    }
+}

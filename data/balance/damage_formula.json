@@ -1,0 +1,25 @@
+{
+    "_meta": {
+        "description": "伤害公式数值配置（第 4 阶段·数据驱动）",
+        "_formula": "final = max(1, (atk + base_damage) * skill_mult - defense * defense_coeff) * 元素 * 弱点 * 背刺 * 格挡"
+    },
+
+    "defense_coeff":           0.50,
+
+    "block_reduce_min":        0.30,
+    "block_reduce_max":        0.80,
+    "block_reduce_default":    0.50,
+
+    "backstab_multiplier":     1.5,
+    "weak_point_multiplier":   1.5,
+
+    "min_damage":              1,
+
+    "global_element_bonus": [
+        {"element": "holy",      "tag": "undead",    "multiplier": 1.5, "_note": "神圣克制不死"},
+        {"element": "fire",      "tag": "beast",     "multiplier": 1.3, "_note": "火焰克制野兽"},
+        {"element": "holy",      "tag": "construct", "multiplier": 1.3, "_note": "神圣克制构造体"},
+        {"element": "lightning", "tag": "construct", "multiplier": 1.5, "_note": "雷电克制构造体"},
+        {"element": "poison",    "tag": "human",     "multiplier": 1.3, "_note": "毒克制人类"}
+    ]
+}

@@ -1,0 +1,51 @@
+{
+  "id": "archer",
+  "display_name": "腐骨射手 / 精灵游侠",
+  "category": "archer",
+  "comment": "弓箭手：远程物理输出，近战脆弱。AI 倾向保持射程外，被近身则后撤。",
+
+  "render": {
+    "width":  24,
+    "height": 48,
+    "color":  [150, 130, 80]
+  },
+
+  "stats": {
+    "max_hp":   55,
+    "atk":      8,
+    "defense":  1,
+    "speed":    120.0,
+
+    "sight_range":   320.0,
+    "lose_range":    400.0,
+    "attack_range":  280.0,
+    "patrol_radius": 48.0,
+
+    "alert_threshold": 0.45,
+    "alert_speed":     2.0,
+    "alert_decay":     0.6,
+
+    "element_tags": ["human"],
+    "weaknesses":   ["physical"],
+    "resistances":  [],
+    "immunities":   [],
+
+    "max_poise":       18.0,
+    "bleed_threshold": 70.0
+  },
+
+  "ranged": {
+    "kind":               "arrow",
+    "min_keep_distance":  140.0,
+    "ideal_distance":     220.0,
+    "max_attack_distance":320.0,
+    "shoot_windup":       28,
+    "shoot_active":       2,
+    "shoot_cooldown":     22,
+    "projectile_damage":  16,
+    "projectile_speed":   520.0,
+    "kite_speed_factor":  0.85
+  },
+
+  "loot_table": "archer_basic"
+}

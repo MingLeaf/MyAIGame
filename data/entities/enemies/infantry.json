@@ -1,0 +1,38 @@
+{
+  "id": "infantry",
+  "display_name": "腐化士兵 / 亡灵剑士",
+  "category": "infantry",
+  "comment": "普通步兵：标准近战小兵，速度中等，血量适中。游戏初期最常见敌人。",
+
+  "render": {
+    "width":  24,
+    "height": 48,
+    "color":  [80, 160, 80]
+  },
+
+  "stats": {
+    "max_hp":   60,
+    "atk":      12,
+    "defense":  2,
+    "speed":    100.0,
+
+    "sight_range":   180.0,
+    "lose_range":    240.0,
+    "attack_range":  36.0,
+    "patrol_radius": 64.0,
+
+    "alert_threshold": 0.4,
+    "alert_speed":     2.0,
+    "alert_decay":     0.6,
+
+    "element_tags": ["human", "undead"],
+    "weaknesses":   ["holy"],
+    "resistances":  [],
+    "immunities":   [],
+
+    "max_poise":       20.0,
+    "bleed_threshold": 80.0
+  },
+
+  "loot_table": "infantry_basic"
+}

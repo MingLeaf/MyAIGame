@@ -1,0 +1,31 @@
+{
+    "weapon_type": "spear",
+    "weapons": [
+        {
+            "id": "iron_spear",
+            "display_name": "战长矛",
+            "color": [200, 180, 160],
+            "base_light_dmg": 12,
+            "base_heavy_dmg": 26,
+            "element": "physical",
+            "stamina": {"light": 14.0, "heavy": 30.0},
+            "knockback": {"light": 180.0, "heavy": 320.0},
+            "bleed_stack_light": 15.0,
+            "rarity": "common",
+            "description": "标准制式长矛，攻击距离极长。"
+        },
+        {
+            "id": "thunder_partisan",
+            "display_name": "雷霆锐戟",
+            "color": [180, 200, 240],
+            "base_light_dmg": 14,
+            "base_heavy_dmg": 30,
+            "element": "lightning",
+            "stamina": {"light": 16.0, "heavy": 34.0},
+            "knockback": {"light": 200.0, "heavy": 360.0},
+            "bleed_stack_light": 0.0,
+            "rarity": "rare",
+            "description": "矛尖游走着雷光的稀有长戟。"
+        }
+    ]
+}

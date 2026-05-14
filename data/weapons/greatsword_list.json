@@ -1,0 +1,29 @@
+{
+    "weapon_type": "greatsword",
+    "weapons": [
+        {
+            "id": "crusader_greatsword",
+            "display_name": "圣战重剑",
+            "color": [220, 200, 80],
+            "base_light_dmg": 18,
+            "base_heavy_dmg": 40,
+            "element": "physical",
+            "stamina": {"light": 22.0, "heavy": 45.0},
+            "knockback": {"light": 240.0, "heavy": 400.0},
+            "rarity": "rare",
+            "description": "需双手紧握才能挥动的厚重大剑。"
+        },
+        {
+            "id": "dragonbone_greatsword",
+            "display_name": "龙骨大剑",
+            "color": [200, 180, 100],
+            "base_light_dmg": 22,
+            "base_heavy_dmg": 48,
+            "element": "physical",
+            "stamina": {"light": 26.0, "heavy": 52.0},
+            "knockback": {"light": 280.0, "heavy": 460.0},
+            "rarity": "legendary",
+            "description": "用堕落龙的脊骨锻造而成。"
+        }
+    ]
+}

@@ -1,0 +1,38 @@
+{
+  "id": "undead",
+  "display_name": "骷髅战士 / 腐骨卫兵",
+  "category": "undead",
+  "comment": "不死类：行动迟缓但血量较厚，需圣属性才能彻底消灭。",
+
+  "render": {
+    "width":  28,
+    "height": 52,
+    "color":  [130, 60, 180]
+  },
+
+  "stats": {
+    "max_hp":   120,
+    "atk":      18,
+    "defense":  6,
+    "speed":    65.0,
+
+    "sight_range":   150.0,
+    "lose_range":    220.0,
+    "attack_range":  40.0,
+    "patrol_radius": 48.0,
+
+    "alert_threshold": 0.5,
+    "alert_speed":     1.6,
+    "alert_decay":     0.5,
+
+    "element_tags": ["undead"],
+    "weaknesses":   ["holy", "fire"],
+    "resistances":  ["poison", "dark"],
+    "immunities":   [],
+
+    "max_poise":       60.0,
+    "bleed_threshold": 120.0
+  },
+
+  "loot_table": "undead_basic"
+}

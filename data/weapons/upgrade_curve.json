@@ -1,0 +1,41 @@
+{
+    "max_level": 10,
+    "_comment": "武器强化曲线：dmg/poise/bleed mult 为每级线性增量。元素路线在 +1 起就覆盖元素并叠加 element_dmg。",
+    "routes": {
+        "none": {
+            "damage_mult_per_level": 0.10,
+            "poise_mult_per_level":  0.00,
+            "bleed_mult_per_level":  0.00,
+            "element":               null,
+            "element_dmg_per_level": 0
+        },
+        "sharp": {
+            "damage_mult_per_level": 0.08,
+            "poise_mult_per_level":  0.00,
+            "bleed_mult_per_level":  0.10,
+            "element":               null,
+            "element_dmg_per_level": 0
+        },
+        "heavy": {
+            "damage_mult_per_level": 0.13,
+            "poise_mult_per_level":  0.05,
+            "bleed_mult_per_level":  0.00,
+            "element":               null,
+            "element_dmg_per_level": 0
+        },
+        "blessed": {
+            "damage_mult_per_level": 0.09,
+            "poise_mult_per_level":  0.02,
+            "bleed_mult_per_level":  0.00,
+            "element":               "holy",
+            "element_dmg_per_level": 1
+        },
+        "elemental": {
+            "damage_mult_per_level": 0.07,
+            "poise_mult_per_level":  0.00,
+            "bleed_mult_per_level":  0.00,
+            "element":               "fire",
+            "element_dmg_per_level": 2
+        }
+    }
+}

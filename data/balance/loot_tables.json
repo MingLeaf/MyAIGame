@@ -1,0 +1,52 @@
+{
+  "_comment": "全局掉落表 —— 各敌人 JSON 通过 loot_table 字段引用本表 ID。entry 字段：item_id / chance / qty_min / qty_max",
+
+  "infantry_basic": [
+    { "item_id": "heal_potion_small", "chance": 0.55, "qty_min": 1, "qty_max": 2 },
+    { "item_id": "stamina_potion_basic", "chance": 0.10, "qty_min": 1, "qty_max": 1 },
+    { "item_id": "sharp_stone", "chance": 0.06, "qty_min": 1, "qty_max": 1 }
+  ],
+
+  "heavy_armor_basic": [
+    { "item_id": "heal_potion_small", "chance": 0.40, "qty_min": 1, "qty_max": 2 },
+    { "item_id": "heal_potion_large", "chance": 0.10, "qty_min": 1, "qty_max": 1 },
+    { "item_id": "knight_chest", "chance": 0.06, "qty_min": 1, "qty_max": 1 },
+    { "item_id": "knight_legs", "chance": 0.06, "qty_min": 1, "qty_max": 1 },
+    { "item_id": "ember_chunk", "chance": 0.20, "qty_min": 1, "qty_max": 2 }
+  ],
+
+  "undead_basic": [
+    { "item_id": "heal_potion_small", "chance": 0.50, "qty_min": 1, "qty_max": 2 },
+    { "item_id": "antidote_universal", "chance": 0.20, "qty_min": 1, "qty_max": 1 },
+    { "item_id": "knight_helm", "chance": 0.04, "qty_min": 1, "qty_max": 1 },
+    { "item_id": "skeleton_ashes", "chance": 0.10, "qty_min": 1, "qty_max": 1 }
+  ],
+
+  "beast_basic": [
+    { "item_id": "heal_potion_small", "chance": 0.65, "qty_min": 1, "qty_max": 3 },
+    { "item_id": "antidote_universal", "chance": 0.18, "qty_min": 1, "qty_max": 1 },
+    { "item_id": "buff_berserk", "chance": 0.05, "qty_min": 1, "qty_max": 1 }
+  ],
+
+  "archer_basic": [
+    { "item_id": "arrow", "chance": 0.85, "qty_min": 3, "qty_max": 8 },
+    { "item_id": "heal_potion_small", "chance": 0.30, "qty_min": 1, "qty_max": 1 },
+    { "item_id": "ranger_hood", "chance": 0.05, "qty_min": 1, "qty_max": 1 }
+  ],
+
+  "mage_basic": [
+    { "item_id": "mana_potion_basic", "chance": 0.60, "qty_min": 1, "qty_max": 2 },
+    { "item_id": "heal_potion_small", "chance": 0.30, "qty_min": 1, "qty_max": 1 },
+    { "item_id": "elemental_essence", "chance": 0.18, "qty_min": 1, "qty_max": 1 },
+    { "item_id": "mage_hat", "chance": 0.05, "qty_min": 1, "qty_max": 1 }
+  ],
+
+  "elite_basic": [
+    { "item_id": "heal_potion_large", "chance": 0.90, "qty_min": 1, "qty_max": 2 },
+    { "item_id": "ember_chunk", "chance": 0.80, "qty_min": 2, "qty_max": 4 },
+    { "item_id": "sharp_stone", "chance": 0.50, "qty_min": 1, "qty_max": 2 },
+    { "item_id": "elemental_essence", "chance": 0.30, "qty_min": 1, "qty_max": 1 },
+    { "item_id": "knight_chest", "chance": 0.20, "qty_min": 1, "qty_max": 1 },
+    { "item_id": "knight_legs", "chance": 0.20, "qty_min": 1, "qty_max": 1 }
+  ]
+}

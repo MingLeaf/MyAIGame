@@ -1,0 +1,31 @@
+{
+    "weapon_type": "staff",
+    "weapons": [
+        {
+            "id": "arcane_staff",
+            "display_name": "奥术法杖",
+            "color": [180, 140, 240],
+            "base_light_dmg": 6,
+            "base_heavy_dmg": 18,
+            "element": "arcane",
+            "stamina": {"light": 10.0, "heavy": 22.0},
+            "knockback": {"light": 100.0, "heavy": 200.0},
+            "heavy_mana_cost": 8,
+            "rarity": "common",
+            "description": "施法者初学时的标准法器。"
+        },
+        {
+            "id": "frost_staff",
+            "display_name": "寒霜法杖",
+            "color": [140, 200, 240],
+            "base_light_dmg": 7,
+            "base_heavy_dmg": 20,
+            "element": "ice",
+            "stamina": {"light": 11.0, "heavy": 24.0},
+            "knockback": {"light": 110.0, "heavy": 220.0},
+            "heavy_mana_cost": 10,
+            "rarity": "rare",
+            "description": "释放出的魔法弹会逐渐冻结目标。"
+        }
+    ]
+}

@@ -1,0 +1,119 @@
+{
+  "_comment": "武器强化材料。route 必须与 weapons.weapon_upgrade.UpgradeRoute 一致；tier 1~3 表示强化阶段。",
+  "materials": [
+    {
+      "item_id": "ember_chunk",
+      "name": "余烬碎块",
+      "description": "蕴含微弱炉火，强化武器的入门材料。",
+      "route": "none",
+      "tier": 1,
+      "weight": 0.1,
+      "max_stack": 99,
+      "icon_id": 200
+    },
+    {
+      "item_id": "ember_radiant",
+      "name": "余烬辉块",
+      "description": "炽热的余烬团，可强化高阶武器。",
+      "route": "none",
+      "tier": 2,
+      "weight": 0.1,
+      "max_stack": 99,
+      "icon_id": 201
+    },
+    {
+      "item_id": "ember_titan",
+      "name": "巨魂余烬",
+      "description": "炉火之核，可承载顶级强化能量。",
+      "route": "none",
+      "tier": 3,
+      "weight": 0.2,
+      "max_stack": 99,
+      "icon_id": 202
+    },
+
+    {
+      "item_id": "sharp_stone",
+      "name": "锋锐之石",
+      "description": "暗黑色磨石，使刀刃更易撕裂血肉（流血）。",
+      "route": "sharp",
+      "tier": 1,
+      "weight": 0.1,
+      "max_stack": 99,
+      "icon_id": 210
+    },
+    {
+      "item_id": "sharp_titan_stone",
+      "name": "锋锐巨石",
+      "description": "顶级锋锐路线材料。",
+      "route": "sharp",
+      "tier": 3,
+      "weight": 0.2,
+      "max_stack": 99,
+      "icon_id": 212
+    },
+
+    {
+      "item_id": "heavy_iron",
+      "name": "沉重之铁",
+      "description": "致密金属块，使武器更具压制力。",
+      "route": "heavy",
+      "tier": 1,
+      "weight": 0.3,
+      "max_stack": 99,
+      "icon_id": 220
+    },
+    {
+      "item_id": "heavy_titan_iron",
+      "name": "重铁巨锭",
+      "description": "顶级沉重路线材料。",
+      "route": "heavy",
+      "tier": 3,
+      "weight": 0.5,
+      "max_stack": 99,
+      "icon_id": 222
+    },
+
+    {
+      "item_id": "blessed_bone",
+      "name": "加护遗骨",
+      "description": "圣徒之骨，使武器附加圣属性。",
+      "route": "blessed",
+      "tier": 1,
+      "weight": 0.1,
+      "max_stack": 99,
+      "icon_id": 230
+    },
+    {
+      "item_id": "blessed_relic",
+      "name": "加护圣骸",
+      "description": "顶级加护路线材料。",
+      "route": "blessed",
+      "tier": 3,
+      "weight": 0.2,
+      "max_stack": 99,
+      "icon_id": 232
+    },
+
+    {
+      "item_id": "elemental_essence",
+      "name": "元素精华",
+      "description": "凝结的元素能量，可附加元素伤害。",
+      "route": "elemental",
+      "tier": 1,
+      "weight": 0.1,
+      "max_stack": 99,
+      "icon_id": 240
+    },
+    {
+      "item_id": "elemental_titan_essence",
+      "name": "元素之心",
+      "description": "顶级元素路线材料。",
+      "route": "elemental",
+      "tier": 3,
+      "weight": 0.2,
+      "max_stack": 99,
+      "icon_id": 242
+    }
+  ]
+}
