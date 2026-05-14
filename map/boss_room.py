@@ -1,12 +1,12 @@
 # =============================================================
 # map/boss_room.py —— Boss 房间（雾门 + 关门 + Boss 血条触发）
 #
-# 第 9 阶段：放置在地图上的 Boss 房间触发器。
+# 第 9 阶段 v2：改为按键交互（F 键），避免碰撞误触发。
 #
 # 设计：
-#   - BossRoom 是一个不可通过的"雾门"实体
-#   - 玩家走入雾门范围 → 触发 boss_room_enter 事件
-#   - GameScene 监听此事件 → push BossScene
+#   - BossRoom 是一个半透明"雾门"实体（粒子动画 + 门框）
+#   - 玩家靠近雾门 → 显示 "按 F 穿越雾门" 提示
+#   - 玩家按 F → GameScene 调用 try_interact() → push BossScene
 #   - BossScene 接管渲染，显示 Boss 血条
 # =============================================================
 from __future__ import annotations
@@ -22,10 +22,11 @@ from ui.font_manager import get_font
 
 class BossRoom:
     """
-    雾门触发器。
+    雾门触发器（按键交互版）。
 
     属性：
-        rect:           碰撞矩形（入口）
+        rect:           碰撞矩形（入口视觉体）
+        trigger_rect:   交互检测范围（比视觉体宽 2 倍）
         boss_id:        关联的 Boss ID
         boss_class:     Boss 类引用（如 DukeRotbone）
         spawn_x, spawn_y: Boss 出生位置（世界坐标）
@@ -58,11 +59,15 @@ class BossRoom:
             int(self.y) - th,
             tw, th,
         )
+        # 交互检测范围（比视觉体宽，方便玩家靠近即可按键）
         self.trigger_rect = pygame.Rect(
             int(self.x) - tw,
             int(self.y) - th,
             tw * 2, th,
         )
+
+        # 当前帧玩家是否在交互范围内
+        self.player_in_range: bool = False
 
     def _generate_particles(self) -> None:
         """生成雾门粒子。"""
@@ -81,10 +86,10 @@ class BossRoom:
     # 更新
     # ----------------------------------------------------------------
 
-    def update(self, dt: float, player_rect: pygame.Rect) -> bool:
+    def update(self, dt: float, player_rect: pygame.Rect) -> None:
         """
-        每帧更新粒子雾门。
-        返回 True 表示玩家进入了雾门范围。
+        每帧更新粒子雾门 + 检测玩家是否在交互范围内。
+        不再自动触发传送，改为通过 try_interact() 按键交互。
         """
         self._anim_timer.update(dt)
 
@@ -100,7 +105,13 @@ class BossRoom:
                 p[3] = random.uniform(-30, -5)
                 p[4] = random.uniform(0.6, 2.0)
 
-        # 玩家进入检测
+        # 更新玩家接近状态（不触发传送）
+        self.player_in_range = self.trigger_rect.colliderect(player_rect)
+
+    def try_interact(self, player_rect: pygame.Rect) -> bool:
+        """
+        玩家按交互键时调用。返回 True 表示应进入 Boss 房间。
+        """
         return self.trigger_rect.colliderect(player_rect)
 
     # ----------------------------------------------------------------
@@ -135,10 +146,11 @@ class BossRoom:
         pygame.draw.rect(surface, (100, 120, 160),
                          (sx - tw // 2, sy - th, tw, th), 2)
 
-        # 交互提示
-        font = get_font(16)
-        hint = font.render("穿越雾门", True, (200, 210, 230))
-        surface.blit(hint, hint.get_rect(center=(sx, sy - th - 12)))
+        # 交互提示（仅玩家在范围内时显示）
+        if self.player_in_range:
+            font = get_font(16)
+            hint = font.render("按 F 穿越雾门", True, (255, 220, 120))
+            surface.blit(hint, hint.get_rect(center=(sx, sy - th - 12)))
 
 
 __all__ = ["BossRoom"]

@@ -51,6 +51,40 @@ class BaseBoss(BaseEnemy):
     CATEGORY = "boss"
 
     # ----------------------------------------------------------------
+    # 受击接口（覆写 BaseEnemy，加入二阶段门槛保护）
+    # ----------------------------------------------------------------
+
+    def take_damage(self, amount: int, knockback_dir: int = 0,
+                    poise_damage: float = 10.0) -> None:
+        """
+        受击入口。
+        1. 二阶段保护：若伤害致死且未触发二阶段，先锁血触发二阶段
+        2. 复活检测：死亡后检查是否可复活
+        """
+        # ---- 二阶段门槛保护 ----
+        if not self._phase_triggered and self._phase_two_cfg:
+            threshold_pct = self._phase_two_cfg.get("hp_threshold_pct", 0.5)
+            threshold_hp = int(self.stats.max_hp * threshold_pct)
+            if self.stats.hp > threshold_hp:
+                after_def = max(1, amount - self.stats.defense)
+                if self.stats.hp - after_def <= 0:
+                    self.stats.hp = threshold_hp + 1
+                    self._enter_phase_two()
+
+        # 继续走父类标准受击流程（含死亡判定）
+        super().take_damage(amount, knockback_dir, poise_damage)
+
+        # ---- 复活检测（在父类受击后，HP 已归零）----
+        if self.stats.is_dead and self._check_revive():
+            # 进入复活等待，不触发 boss_killed 事件
+            return
+
+        # 真正死亡（无复活或复活已用尽）→ 派发 boss_killed
+        if self.stats.is_dead and not self._revive_pending:
+            self.dead = True
+            self._emit_boss_killed()
+
+    # ----------------------------------------------------------------
     # 初始化
     # ----------------------------------------------------------------
 
@@ -102,6 +136,10 @@ class BaseBoss(BaseEnemy):
         self.stats.patrol_radius   = float(stats.get("patrol_radius", 0.0))
         self.stats.max_poise       = float(stats.get("max_poise", 80.0))
         self.stats.bleed_threshold = float(stats.get("bleed_threshold", 200.0))
+
+        # 重建 PoiseComponent 以匹配正确的 max_poise（修复韧性条不满的 bug）
+        from combat.poise_system import PoiseComponent
+        self.stats._poise = PoiseComponent(max_poise=self.stats.max_poise)
 
         # 元素标签
         self.stats.element_tags = stats.get("element_tags", ["boss"])
@@ -205,6 +243,10 @@ class BaseBoss(BaseEnemy):
         pct = self._revive_cfg.get("revive_hp_pct", 0.6)
         self.stats.hp = int(self.stats.max_hp * pct)
 
+        # 重置状态机（从 Dead 回到 Idle，使 Boss 恢复战斗）
+        if self.fsm.is_in("Dead"):
+            self.fsm.change_state("Idle")
+
         event_manager.emit("boss_revived", {
             "boss": self,
             "boss_id": self._boss_data.get("id", ""),
@@ -216,11 +258,9 @@ class BaseBoss(BaseEnemy):
     # ----------------------------------------------------------------
 
     def on_death(self) -> None:
-        """Boss 死亡处理。可能触发复活检查。"""
+        """Boss 死亡处理（备用路径：如果被外部直接调用）。"""
         if self._check_revive():
             return
-
-        # 真正死亡
         super().on_death()
         self._emit_boss_killed()
 
@@ -342,6 +382,43 @@ class BaseBoss(BaseEnemy):
         pygame.draw.rect(surface, (255, 255, 255),
                          (sx, sy, self.rect.width, self.rect.height), 2)
 
+        # ---- 韧性条（Boss 底部小条）----
+        poise_max = float(getattr(self.stats, "max_poise", 80.0))
+        poise_cur = float(getattr(self.stats, "current_poise", poise_max))
+        if poise_max > 0:
+            poise_ratio = max(0.0, min(1.0, poise_cur / poise_max))
+            bar_w = self.rect.width
+            bar_h = 4
+            bar_y = sy + self.rect.height + 2
+            pygame.draw.rect(surface, (40, 40, 40), (sx, bar_y, bar_w, bar_h))
+            if poise_ratio > 0:
+                # 韧性条颜色：绿 → 黄 → 红
+                if poise_ratio > 0.6:
+                    pc = (60, 200, 60)
+                elif poise_ratio > 0.3:
+                    pc = (220, 200, 40)
+                else:
+                    pc = (200, 60, 40)
+                pygame.draw.rect(surface, pc, (sx, bar_y, int(bar_w * poise_ratio), bar_h))
+
+        # ---- 攻击框可视化 ---
+        if self.is_casting:
+            atk_rect = self._get_attack_rect().move(-ox, -oy)
+
+            if self.is_skill_active:
+                # 判定帧：橙黄（造成伤害）
+                fill_color = (255, 180, 30, 160)
+                border_color = (255, 230, 50)
+            else:
+                # 前摇：白色（警告）
+                fill_color = (255, 255, 255, 80)
+                border_color = (255, 255, 255, 220)
+
+            fill_surf = pygame.Surface((atk_rect.width, atk_rect.height), pygame.SRCALPHA)
+            fill_surf.fill(fill_color)
+            surface.blit(fill_surf, (atk_rect.x, atk_rect.y))
+            pygame.draw.rect(surface, border_color[:3], atk_rect, width=2)
+
         # 二阶段标记
         if self._phase == 2:
             pygame.draw.circle(surface, (255, 60, 60),
@@ -349,7 +426,6 @@ class BaseBoss(BaseEnemy):
 
         # 复活倒计时
         if self._revive_pending:
-            import math
             bar_w = 40
             bar_h = 6
             progress = 1.0 - self._revive_timer / self._revive_cfg.get("revive_delay", 3.0)

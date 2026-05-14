@@ -53,11 +53,16 @@ class DukeRotbone(BaseBoss):
 
         # 如果正在施法中则不打断
         if self._current_skill is not None:
-            self.update_skill_cast(dt)
-            # 技能判定
-            hb = self.get_skill_hitbox()
-            if hb is not None and self.player is not None:
-                self._apply_skill_hitbox(hb)
+            just_active = self.update_skill_cast(dt)
+            if just_active:
+                sk = self._current_skill
+                # 召唤技能（damage_mult=0）不生成判定框，直接执行召唤
+                if sk.skill_id == "summon_skeleton":
+                    self._do_summon()
+                else:
+                    hb = self.get_skill_hitbox()
+                    if hb is not None and self.player is not None:
+                        self._apply_skill_hitbox(hb)
             return
 
         # 选择技能
@@ -103,7 +108,7 @@ class DukeRotbone(BaseBoss):
     # ----------------------------------------------------------------
 
     def _apply_skill_hitbox(self, hb) -> None:
-        """将技能判定框施加到玩家。"""
+        """将技能判定框施加到玩家（含弹反/格挡支持）。"""
         if self.player is None:
             return
         if not hb.rect.colliderect(self.player.rect):
@@ -118,6 +123,7 @@ class DukeRotbone(BaseBoss):
         self.player.take_damage(
             damage,
             knockback_dir=self._facing,
+            attacker=self,               # 传入攻击者引用 → 支持弹反/格挡
             element=sk.element,
             poise_damage=sk.poise_damage,
         )
@@ -125,8 +131,6 @@ class DukeRotbone(BaseBoss):
         # 状态积累
         if sk.status_buildup:
             self._apply_status(sk)
-
-        hb.active_frames = 0  # 单次命中
 
     def _apply_status(self, sk) -> None:
         """对玩家施加状态异常积累。"""

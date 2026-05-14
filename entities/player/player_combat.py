@@ -126,6 +126,11 @@ class PlayerCombat:
         """
         p = self.player
 
+        # 0. 调试模式：上帝模式无敌
+        import utils.debug as dbg
+        if dbg.enabled and dbg.god_mode:
+            return 0
+
         # 1. 死亡 / 无敌帧
         if p.fsm.is_in("Dead"):
             return 0

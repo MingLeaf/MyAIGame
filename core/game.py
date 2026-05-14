@@ -98,6 +98,8 @@ class Game:
             if input_handler.key_just_pressed(pygame.K_F3):
                 debug.enabled     = not debug.enabled
                 debug.show_hitbox = debug.enabled
+                debug.god_mode     = debug.enabled
+                debug.one_hit_kill = debug.enabled
 
             # 5. 场景事件处理
             scene_manager.handle_events(events)

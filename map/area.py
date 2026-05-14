@@ -153,8 +153,8 @@ class Area:
         # 古墓地带 Boss：腐骨公爵
         if self.area_id == "area_graveyard":
             ts = self.tile_map.tile_size
-            # 雾门放在传送门前方 (col 93-94)
-            gate_x = 94 * ts + ts // 2
+            # 雾门放在 cf_03 营地(col 92)和传送门(col 96)之间，col 95
+            gate_x = 95 * ts + ts // 2
             gate_y = 17 * ts - ts // 2   # row 17 地面位置
             room = BossRoom(
                 room_id="boss_duke",

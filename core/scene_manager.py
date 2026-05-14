@@ -96,9 +96,9 @@ class SceneManager:
             self._stack[-1].update(dt)
 
     def render(self, renderer):
-        # 从底到顶渲染（支持透明叠加）
-        for scene in self._stack:
-            scene.render(renderer)
+        # 从底到顶渲染，但只渲染栈顶（非栈顶场景被暂停，不应渲染）
+        if self._stack:
+            self._stack[-1].render(renderer)
 
     def handle_events(self, events: list):
         if self._stack:

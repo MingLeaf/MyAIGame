@@ -104,5 +104,29 @@ class BossHealthBar:
             phase_surf = get_font(14).render("◆ 狂化", True, (255, 140, 40))
             surface.blit(phase_surf, (bx + self.BAR_W + 10, by))
 
+        # ---- 韧性/架势条（在 HP 条下方）----
+        poise_max = getattr(self._boss.stats, "max_poise", 0)
+        if poise_max > 0:
+            poise_current = getattr(self._boss.stats, "poise", 0)
+            poise_ratio = poise_current / max(1, poise_max)
+            POISE_H = 6
+            poise_y = by + self.BAR_H + 4
+            poise_w = max(0, int(poise_ratio * self.BAR_W))
+
+            # 背景
+            pygame.draw.rect(surface, (20, 18, 28),
+                             (bx, poise_y, self.BAR_W, POISE_H), border_radius=2)
+            # 填充（灰白色）
+            if poise_w > 0:
+                poise_color = (180, 170, 160) if poise_ratio > 0.3 else (120, 80, 80)
+                pygame.draw.rect(surface, poise_color,
+                                 (bx, poise_y, poise_w, POISE_H), border_radius=2)
+            # 边框
+            pygame.draw.rect(surface, (60, 55, 50),
+                             (bx, poise_y, self.BAR_W, POISE_H), width=1, border_radius=2)
+            # 标签
+            poise_label = get_font(11).render("架势", True, (140, 135, 130))
+            surface.blit(poise_label, (bx - 28, poise_y - 1))
+
 
 __all__ = ["BossHealthBar"]

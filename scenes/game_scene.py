@@ -128,6 +128,11 @@ class GameScene(BaseScene):
         event_manager.unsubscribe("player_leveled_up",      self._on_player_leveled_up)
         event_manager.unsubscribe("consumables_refilled",   self._on_consumables_refilled)
 
+    def on_resume(self):
+        """从 BossScene pop 后恢复：重置雾门触发标记，允许再次进入。"""
+        self._boss_triggered = False
+        self._death_paused = False
+
     def _on_enemy_dead(self, data: dict) -> None:
         """
         监听 enemy_dead 事件，执行掉落逻辑 + 灵魂碎片。
@@ -390,7 +395,7 @@ class GameScene(BaseScene):
                     from scenes.pause_scene import PauseScene
                     scene_manager.push(PauseScene())
                 if event.key == pygame.K_f and self._player and not self._campfire_menu.visible:
-                    # 检测是否靠近营地
+                    # 优先检测：是否靠近营地
                     near_campfire = False
                     for cf in self._area.campfires:
                         if cf.try_activate(self._player.rect,
@@ -401,6 +406,22 @@ class GameScene(BaseScene):
                     if near_campfire:
                         self._campfire_menu.open(self._player)
                         self._campfire_paused = True
+                    # 其次检测：是否靠近雾门（按键交互，避免碰撞误触发）
+                    elif not self._boss_triggered:
+                        for br in self._area.boss_rooms:
+                            if br.try_interact(self._player.rect):
+                                self._boss_triggered = True
+                                # 确保复活点
+                                from systems.campfire_system import CampfireSystem
+                                last_cf = CampfireSystem.get_last_campfire()
+                                if last_cf is None and self._area.campfires:
+                                    player_cx = self._player.rect.centerx
+                                    nearest = min(self._area.campfires,
+                                                  key=lambda cf: abs(cf.x - player_cx))
+                                    area_id = getattr(self._area, "area_id", "area_graveyard")
+                                    CampfireSystem.activate(nearest.campfire_id, area_id, nearest.x, nearest.y)
+                                self._enter_boss_room(br)
+                                continue
                 # I 键：背包
                 if event.key == pygame.K_i and self._player:
                     self._inv_screen.toggle(self._player)
@@ -411,9 +432,6 @@ class GameScene(BaseScene):
                     self._equip_screen.toggle(self._player)
                     if self._equip_screen.is_open:
                         self._inv_screen.close()
-                # 调试：F3 切换调试模式
-                if event.key == pygame.K_F3:
-                    debug.enabled = not debug.enabled
                 # 调试：T 键测试受击
                 if event.key == pygame.K_t and self._player:
                     self._player.take_damage(15, knockback_dir=-1)
@@ -460,21 +478,10 @@ class GameScene(BaseScene):
 
         self._area.update(dt, self._player.rect)
 
-        # ---- 第 9 阶段：检测雾门进入 ----
+        # ---- 第 9 阶段：雾门更新（仅更新粒子 + 检测接近，不自动触发传送）----
         if not self._boss_triggered:
             for br in self._area.boss_rooms:
-                if br.trigger_rect.colliderect(self._player.rect):
-                    self._boss_triggered = True
-                    # 确保复活点：使用最近激活的营地（若无则用区域第一个营地）
-                    from systems.campfire_system import CampfireSystem
-                    last_cf = CampfireSystem.get_last_campfire()
-                    if last_cf is None and self._area.campfires:
-                        # 自动激活最近的营地
-                        cf = self._area.campfires[0]
-                        area_id = getattr(self._area, "area_id", "area_graveyard")
-                        CampfireSystem.activate(cf.campfire_id, area_id, cf.x, cf.y)
-                    self._enter_boss_room(br)
-                    return
+                br.update(dt, self._player.rect)
 
         # ---- 第 8 阶段：死亡遗物更新 ----
         if self._area.death_relic is not None:
@@ -609,14 +616,11 @@ class GameScene(BaseScene):
         boss = boss_cls(boss_room.spawn_x, boss_room.spawn_y)
         boss.player = self._player
 
-        # 将 Boss 添加到区域敌人列表
-        self._area.enemies.append(boss)
-
-        # 切换到 Boss 场景（replace：销毁当前 GameScene 状态）
+        # 切换到 Boss 场景（独立地图，push 叠加）
         boss_scene = BossScene(
             boss=boss,
             player=self._player,
-            area=self._area,
+            area=self._area,          # 复活源区域
             boss_room_id=boss_room.room_id,
         )
-        scene_manager.replace(boss_scene)
+        scene_manager.push(boss_scene)

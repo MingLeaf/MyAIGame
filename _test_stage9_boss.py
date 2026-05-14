@@ -60,7 +60,7 @@ from entities.enemy.bosses.duke_rotbone import DukeRotbone
 boss = DukeRotbone(3000, 512)
 assert boss.boss_display_name == "腐骨公爵"
 assert boss.stats.max_hp == 800
-assert boss.stats.atk == 35
+assert boss.stats.atk == 23
 assert len(boss._skills) == 4
 print(f"  ✓ {boss.boss_display_name}: HP={boss.stats.hp}, Atk={boss.stats.atk}, Skills={len(boss._skills)}")
 

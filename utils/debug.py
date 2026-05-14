@@ -16,6 +16,10 @@ enabled      = DEBUG_MODE
 show_hitbox  = DEBUG_SHOW_HITBOX
 show_fps     = DEBUG_SHOW_FPS
 
+# 调试战斗辅助（只在 enabled=True 时生效）
+god_mode     = False   # 玩家无敌（不受伤害）
+one_hit_kill = False   # 玩家对敌人一击必杀
+
 # 本帧调试文本行列表（每帧清空）
 _debug_lines: List[str] = []
 

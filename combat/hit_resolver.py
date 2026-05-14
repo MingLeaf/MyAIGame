@@ -142,6 +142,16 @@ class HitResolver:
             if magic_pct != 0.0:
                 final_dmg = max(1, int(final_dmg * (1.0 + magic_pct)))
 
+        # ---- 调试：一击必杀 ----
+        import utils.debug as dbg
+        if dbg.enabled and dbg.one_hit_kill:
+            final_dmg = 99999  # 远超最大HP+防御，保证一击必杀
+            hit_info = HitInfo(
+                base_damage=final_dmg, skill_multiplier=1.0,
+                element=hit_info.element, is_backstab=hit_info.is_backstab,
+                poise_damage=9999.0,
+            )
+
         # 4. 方向
         knockback_dir = 1 if enemy.x > player.x else -1
 
