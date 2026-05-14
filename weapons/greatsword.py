@@ -7,6 +7,7 @@
 # =============================================================
 from __future__ import annotations
 from weapons.base_weapon import BaseWeapon, WeaponType, AttackData
+from weapons.greatsword_art import GreatswordQuakeArt
 
 
 class Greatsword(BaseWeapon):
@@ -47,6 +48,10 @@ class Greatsword(BaseWeapon):
     # 无状态积累，但韧性伤害极高（在 AttackData 中 poise_damage 会更高）
     _bleed_stack_light  = 0.0
     _poison_stack_light = 0.0
+
+    def __init__(self):
+        super().__init__()
+        self.weapon_art_obj = GreatswordQuakeArt()
 
     def get_light_attack(self, combo_step: int = 0) -> AttackData:
         """大剑轻攻击：韧性伤害更高，步兵需2~3次破韧。"""

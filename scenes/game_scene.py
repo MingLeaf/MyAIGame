@@ -13,6 +13,8 @@ from entities.player    import Player
 from ui.hud             import HUD
 from ui.inventory_screen  import InventoryScreen
 from ui.equipment_screen  import EquipmentScreen
+from ui.death_screen      import DeathScreen
+from ui.campfire_menu     import CampfireMenu
 from utils.color        import UI_HIGHLIGHT
 from config             import SCREEN_WIDTH, SCREEN_HEIGHT
 import utils.debug as debug
@@ -23,6 +25,11 @@ from combat.drop_system    import roll_drops, apply_drops_to_player
 from items.item_manager    import ItemManager
 from systems.loot_system   import LootSystem
 from core.event_manager    import event_manager
+# 第 8 阶段：游戏规则核心系统
+from systems.soul_fragment_system import SoulFragmentSystem
+from systems.respawn_system       import RespawnSystem
+from systems.campfire_system      import CampfireSystem
+from systems.quest_system         import QuestSystem
 
 
 class GameScene(BaseScene):
@@ -50,6 +57,19 @@ class GameScene(BaseScene):
         # ---- 背包 & 装备界面 ----
         self._inv_screen   = InventoryScreen()
         self._equip_screen = EquipmentScreen()
+
+        # ---- 死亡界面（第 8.1 阶段）----
+        self._death_screen = DeathScreen()
+        # 死亡暂停标记：true 时暂停除死亡界面外的所有游戏逻辑
+        self._death_paused: bool = False
+
+        # ---- 营地菜单（第 8.1 阶段）----
+        self._campfire_menu = CampfireMenu()
+        # 营地暂停标记
+        self._campfire_paused: bool = False
+
+        # ---- Boss 触发标记 ----
+        self._boss_triggered: bool = False
 
     def on_enter(self):
         pygame.font.init()
@@ -87,6 +107,13 @@ class GameScene(BaseScene):
         # ---- 监听弓无箭事件，弹提示 ----
         event_manager.subscribe("weapon_no_ammo", self._on_weapon_no_ammo)
 
+        # 第 8 阶段：初始化进度系统 + 监听灵魂碎片事件
+        QuestSystem.init()
+        event_manager.subscribe("soul_fragments_changed", self._on_soul_fragments_changed)
+        event_manager.subscribe("death_relic_recovered",  self._on_death_relic_recovered)
+        event_manager.subscribe("player_leveled_up",      self._on_player_leveled_up)
+        event_manager.subscribe("consumables_refilled",   self._on_consumables_refilled)
+
         self._loaded = True
 
     def on_exit(self):
@@ -96,16 +123,23 @@ class GameScene(BaseScene):
         event_manager.unsubscribe("set_bonus_activated",   self._on_set_bonus_activated)
         event_manager.unsubscribe("set_bonus_deactivated", self._on_set_bonus_deactivated)
         event_manager.unsubscribe("weapon_no_ammo",        self._on_weapon_no_ammo)
+        event_manager.unsubscribe("soul_fragments_changed", self._on_soul_fragments_changed)
+        event_manager.unsubscribe("death_relic_recovered",  self._on_death_relic_recovered)
+        event_manager.unsubscribe("player_leveled_up",      self._on_player_leveled_up)
+        event_manager.unsubscribe("consumables_refilled",   self._on_consumables_refilled)
 
     def _on_enemy_dead(self, data: dict) -> None:
         """
-        监听 enemy_dead 事件，执行掉落逻辑。
+        监听 enemy_dead 事件，执行掉落逻辑 + 灵魂碎片。
         data = {"enemy": BaseEnemy 实例}
 
         第 7 阶段改造：
             通过 LootSystem.spawn_for_enemy 统一处理，掉落表
             优先取自全局 data/balance/loot_tables.json，未匹配
             时回退到 enemy.drop_table（向后兼容）。
+
+        第 8 阶段改造：
+            + 灵魂碎片自动入账（SoulFragmentSystem.grant_for_enemy）
         """
         if self._player is None or self._area is None:
             return
@@ -113,24 +147,36 @@ class GameScene(BaseScene):
         if enemy is None:
             return
 
-        spawned = LootSystem.spawn_for_enemy(self._area, enemy)
-        if not spawned:
-            return
-
-        wx = enemy.rect.centerx
-        wy = enemy.rect.top
-        # 飘字提示有物品掉落
-        for di in spawned:
-            from items.item_database import item_db
-            proto = item_db.get(di.item_id)
-            name  = proto.name if proto else di.item_id
+        # ---- 灵魂碎片（第 8 阶段）----
+        souls_gained = SoulFragmentSystem.grant_for_enemy(self._player, enemy)
+        if souls_gained > 0:
+            wx = enemy.rect.centerx
+            wy = enemy.rect.top
             self._floating_texts.add(
-                f"掉落 {name}×{di.quantity}",
-                wx, wy - 4,
-                color=(220, 200, 120),
-                size=14,
-                lifetime=1.6,
+                f"+{souls_gained} 灵魂",
+                wx, wy - 16,
+                color=(180, 255, 140),
+                size=15,
+                lifetime=1.4,
             )
+
+        # ---- 物品掉落 ----
+        spawned = LootSystem.spawn_for_enemy(self._area, enemy)
+        if spawned:
+            wx = enemy.rect.centerx
+            wy = enemy.rect.top
+            # 飘字提示有物品掉落
+            for di in spawned:
+                from items.item_database import item_db
+                proto = item_db.get(di.item_id)
+                name  = proto.name if proto else di.item_id
+                self._floating_texts.add(
+                    f"掉落 {name}×{di.quantity}",
+                    wx, wy - 4,
+                    color=(220, 200, 120),
+                    size=14,
+                    lifetime=1.6,
+                )
 
     def _on_item_picked_up(self, data: dict) -> None:
         """玩家拾取掉落物时显示飘字提示。"""
@@ -191,6 +237,88 @@ class GameScene(BaseScene):
         )
 
     # ----------------------------------------------------------------
+    # 第 8 阶段：灵魂碎片 / 死亡遗物 / 升级 / 营地补满 事件处理
+    # ----------------------------------------------------------------
+
+    def _on_soul_fragments_changed(self, data: dict) -> None:
+        """灵魂碎片变化时显示飘字。在敌人死亡位置 / 玩家头顶显示。"""
+        if self._player is None:
+            return
+        amount = data.get("amount", 0)
+        source = data.get("source", "")
+        if amount == 0:
+            return
+
+        # 敌人掉落 → 不在此处显示（已在 _on_enemy_dead 中显示在敌人位置）
+        if source == "enemy":
+            return
+
+        wx = self._player.rect.centerx
+        wy = self._player.rect.top - 30
+        if amount > 0:
+            self._floating_texts.add(
+                f"+{amount} 灵魂",
+                wx, wy,
+                color=(180, 255, 140),
+                size=14,
+                lifetime=1.2,
+            )
+        else:
+            self._floating_texts.add(
+                f"{amount} 灵魂 (遗失)",
+                wx, wy,
+                color=(255, 100, 100),
+                size=14,
+                lifetime=1.8,
+            )
+
+    def _on_death_relic_recovered(self, data: dict) -> None:
+        """捡回遗物时显示大飘字。"""
+        if self._player is None:
+            return
+        amount = data.get("amount", 0)
+        wx = self._player.rect.centerx
+        wy = self._player.rect.top - 20
+        self._floating_texts.add(
+            f"◇ 捡回 {amount} 灵魂碎片 ◇",
+            wx, wy,
+            color=(255, 215, 60),
+            size=18,
+            lifetime=2.5,
+        )
+
+    def _on_player_leveled_up(self, data: dict) -> None:
+        """升级时显示飘字。"""
+        if self._player is None:
+            return
+        levels = data.get("levels", 1)
+        new_lv = data.get("new_level", 1)
+        wx = self._player.rect.centerx
+        wy = self._player.rect.top - 30
+        self._floating_texts.add(
+            f"▲ 升级至 Lv.{new_lv} ▲",
+            wx, wy,
+            color=(100, 220, 255),
+            size=18,
+            lifetime=2.2,
+        )
+
+    def _on_consumables_refilled(self, data: dict) -> None:
+        """消耗品补满时显示飘字。"""
+        if self._player is None:
+            return
+        count = data.get("count", 0)
+        wx = self._player.rect.centerx
+        wy = self._player.rect.top - 20
+        self._floating_texts.add(
+            f"● 消耗品已补满 ({count}种) ●",
+            wx, wy,
+            color=(255, 180, 100),
+            size=15,
+            lifetime=1.8,
+        )
+
+    # ----------------------------------------------------------------
     # 抛射物（弓箭 / 魔法弹 / 毒飞镖）每帧更新
     # ----------------------------------------------------------------
 
@@ -222,6 +350,32 @@ class GameScene(BaseScene):
 
     def handle_events(self, events: list):
         for event in events:
+            # ---- 死亡界面优先消耗所有事件 ----
+            if self._death_screen.visible:
+                action = self._death_screen.handle_event(event)
+                if action == "respawn":
+                    # 从最近营地复活
+                    RespawnSystem.handle_death(self._player, self._area)
+                    self._death_screen.hide()
+                    self._death_paused = False
+                    continue
+                elif action == "quit":
+                    # 回到主菜单（同时复活，避免存档异常）
+                    RespawnSystem.handle_death(self._player, self._area)
+                    self._death_screen.hide()
+                    self._death_paused = False
+                    from scenes.main_menu_scene import MainMenuScene
+                    scene_manager.switch(MainMenuScene())
+                    continue
+                # 其他按键被死亡界面拦截
+                if event.type == pygame.KEYDOWN:
+                    continue
+
+            # ---- 营地菜单优先消耗事件 ----
+            if self._campfire_menu.visible:
+                if self._campfire_menu.handle_event(event):
+                    continue
+
             # ---- 背包界面优先消耗事件 ----
             if self._inv_screen.is_open:
                 if self._inv_screen.handle_event(event):
@@ -235,13 +389,21 @@ class GameScene(BaseScene):
                 if event.key == pygame.K_ESCAPE:
                     from scenes.pause_scene import PauseScene
                     scene_manager.push(PauseScene())
-                if event.key == pygame.K_f and self._player:
+                if event.key == pygame.K_f and self._player and not self._campfire_menu.visible:
+                    # 检测是否靠近营地
+                    near_campfire = False
                     for cf in self._area.campfires:
-                        cf.try_activate(self._player.rect)
+                        if cf.try_activate(self._player.rect,
+                                           player=self._player,
+                                           area=self._area):
+                            near_campfire = True
+                    # 打开营地菜单
+                    if near_campfire:
+                        self._campfire_menu.open(self._player)
+                        self._campfire_paused = True
                 # I 键：背包
                 if event.key == pygame.K_i and self._player:
                     self._inv_screen.toggle(self._player)
-                    # 打开背包时关闭装备界面（防止遮挡混乱）
                     if self._inv_screen.is_open:
                         self._equip_screen.close()
                 # C 键：装备界面（Character）
@@ -260,12 +422,66 @@ class GameScene(BaseScene):
         if not self._loaded or not self._player:
             return
 
+        # ---- 死亡界面：暂停游戏逻辑，仅更新死亡界面 ----
+        if self._death_paused:
+            self._death_screen.update(dt)
+            return
+
+        # ---- 营地菜单：暂停游戏逻辑 ----
+        if self._campfire_menu.visible:
+            self._campfire_menu.update(dt)
+            return
+
         # ---- 背包/装备界面打开时暂停游戏逻辑 ----
         if self._inv_screen.is_open or self._equip_screen.is_open:
             return
 
         self._player.update(dt, self._area.collision)
+
+        # ---- 第 8.1 阶段：玩家死亡检测 → 显示死亡界面 ----
+        # 条件：HP <= 0 且不在死亡界面暂停中
+        if self._player.stats.is_dead and not self._death_paused:
+            # 进入 Dead 状态（由 PlayerCombat 延迟到这里）
+            if not self._player.fsm.is_in("Dead"):
+                self._player.fsm.change_state("Dead")
+
+            lost_souls = self._player.soul_fragments
+            dx = self._player.rect.centerx
+            dy = self._player.rect.centery
+
+            # 先创建遗物（在死亡位置）
+            if self._area is not None:
+                SoulFragmentSystem.create_death_relic(self._player, self._area)
+
+            # 显示死亡界面
+            self._death_screen.show(lost_souls, dx, dy)
+            self._death_paused = True
+            return
+
         self._area.update(dt, self._player.rect)
+
+        # ---- 第 9 阶段：检测雾门进入 ----
+        if not self._boss_triggered:
+            for br in self._area.boss_rooms:
+                if br.trigger_rect.colliderect(self._player.rect):
+                    self._boss_triggered = True
+                    # 确保复活点：使用最近激活的营地（若无则用区域第一个营地）
+                    from systems.campfire_system import CampfireSystem
+                    last_cf = CampfireSystem.get_last_campfire()
+                    if last_cf is None and self._area.campfires:
+                        # 自动激活最近的营地
+                        cf = self._area.campfires[0]
+                        area_id = getattr(self._area, "area_id", "area_graveyard")
+                        CampfireSystem.activate(cf.campfire_id, area_id, cf.x, cf.y)
+                    self._enter_boss_room(br)
+                    return
+
+        # ---- 第 8 阶段：死亡遗物更新 ----
+        if self._area.death_relic is not None:
+            self._area.death_relic.update(dt)
+            # 每帧检测玩家是否捡回遗物
+            SoulFragmentSystem.try_pickup_relic(self._player, self._area)
+
         self._camera.update(dt, self._player.rect)
         self._hud.update(self._player, dt)
 
@@ -304,6 +520,7 @@ class GameScene(BaseScene):
             debug.add_line(f"Inv:   {p.invincible}")
             debug.add_line(f"STR:{g.strength} DEX:{g.dexterity} VIT:{g.vitality} END:{g.endurance}")
             debug.add_line(f"Load:  {g.equip_weight:.1f}/{g.max_equip_load:.1f}kg  Roll:{g.roll_type}")
+            debug.add_line(f"Souls: {p.soul_fragments}  Lv.{p.build.level}  Unspent:{p.build.unspent}")
             debug.add_line(f"Enemies: {len(self._area.enemies)}")
 
     def render(self, renderer):
@@ -353,12 +570,20 @@ class GameScene(BaseScene):
         # 11. 装备界面（覆盖层）
         self._equip_screen.render(surface)
 
+        # 12. 死亡界面（最高覆盖层，第 8.1 阶段）
+        if self._death_screen.visible:
+            self._death_screen.render(surface)
+
+        # 13. 营地菜单（最高覆盖层，第 8.1 阶段）
+        if self._campfire_menu.visible:
+            self._campfire_menu.render(surface)
+
         pygame.display.flip()
 
     def _render_hints(self, surface: pygame.Surface):
         hints = [
             "A/D: 移动    Space: 跳跃    S+Space: 下穿平台",
-            "Shift: 翻滚    J: 轻攻击    K: 重攻击    L: 格挡/弹反",
+            "Shift: 翻滚    J: 轻攻击    K: 重攻击    L: 格挡/弹反    U: 战技",
             "F: 篝火    I: 背包    C: 装备    T: 受击测试    F3: 调试    ESC: 暂停",
         ]
         font = self._hint_font
@@ -369,3 +594,29 @@ class GameScene(BaseScene):
             x = SCREEN_WIDTH - surf.get_width() - 12
             surface.blit(surf, (x, top))
             top += surf.get_height() + 4
+
+    # ----------------------------------------------------------------
+    # Boss 房间入口（第 9 阶段）
+    # ----------------------------------------------------------------
+
+    def _enter_boss_room(self, boss_room) -> None:
+        """玩家走入雾门 → 创建 Boss 实例 + replace 到 BossScene。"""
+        from scenes.boss_scene import BossScene
+        from core.scene_manager import scene_manager
+
+        # 创建 Boss 实例
+        boss_cls = boss_room.boss_cls
+        boss = boss_cls(boss_room.spawn_x, boss_room.spawn_y)
+        boss.player = self._player
+
+        # 将 Boss 添加到区域敌人列表
+        self._area.enemies.append(boss)
+
+        # 切换到 Boss 场景（replace：销毁当前 GameScene 状态）
+        boss_scene = BossScene(
+            boss=boss,
+            player=self._player,
+            area=self._area,
+            boss_room_id=boss_room.room_id,
+        )
+        scene_manager.replace(boss_scene)

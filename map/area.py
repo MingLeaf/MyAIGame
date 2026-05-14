@@ -13,6 +13,7 @@ from map.layer_renderer import LayerRenderer
 from map.campfire      import Campfire
 from map.trap          import Trap
 from map.transition_gate import TransitionGate
+from map.boss_room     import BossRoom
 from utils import json_loader
 from config import DATA_DIR
 
@@ -40,6 +41,7 @@ class Area:
         self.campfires:   List[Campfire] = []
         self.traps:       List[Trap]     = []
         self.transitions: List[TransitionGate] = []
+        self.boss_rooms:  List["BossRoom"] = []
         self.enemies:     List["BaseEnemy"] = []
         # 第 5 阶段·武器系统：抛射物列表（弓箭 / 魔法弹）
         # GameScene 每帧需调用 update() 推进；命中检测由 HitResolver 处理
@@ -48,6 +50,8 @@ class Area:
         # 由 ItemManager.spawn_drop() / roll_and_spawn() 写入，
         # GameScene 通过 ItemManager.update_drops + try_pickup_all 驱动
         self.dropped_items: List = []
+        # 第 8 阶段·灵魂碎片系统：死亡遗物（每次只有一个）
+        self.death_relic = None
 
         self._loaded = False
 
@@ -94,6 +98,9 @@ class Area:
         # 加载敌人
         self._load_enemies()
 
+        # 加载 Boss 房间（雾门）
+        self._load_boss_rooms()
+
         self._loaded = True
 
     def reload(self):
@@ -115,8 +122,12 @@ class Area:
             self.campfires.append(cf)
 
         # 清空抛射物 / 掉落物（重置场景状态）
+        # 注意：death_relic 不清除（属于跨死亡的持久对象）
         self.projectiles.clear()
         self.dropped_items.clear()
+
+        # 重载 Boss 房间
+        self._load_boss_rooms()
 
         # 重载敌人（全部重新生成）
         self._load_enemies()
@@ -133,6 +144,28 @@ class Area:
         self.enemies.clear()
         spawn_from_area_file(self, self.area_id)
 
+    def _load_boss_rooms(self):
+        """加载 Boss 房间（雾门）。"""
+        self.boss_rooms.clear()
+
+        from entities.enemy.bosses.duke_rotbone import DukeRotbone
+
+        # 古墓地带 Boss：腐骨公爵
+        if self.area_id == "area_graveyard":
+            ts = self.tile_map.tile_size
+            # 雾门放在传送门前方 (col 93-94)
+            gate_x = 94 * ts + ts // 2
+            gate_y = 17 * ts - ts // 2   # row 17 地面位置
+            room = BossRoom(
+                room_id="boss_duke",
+                world_x=gate_x, world_y=gate_y,
+                boss_id="duke_rotbone",
+                boss_class=DukeRotbone,
+                spawn_x=96 * ts + ts // 2,  # Boss 出生在传送门位置
+                spawn_y=17 * ts - 64,
+            )
+            self.boss_rooms.append(room)
+
     # ---- 更新 ----
 
     def update(self, dt: float, player_rect: pygame.Rect):
@@ -140,6 +173,8 @@ class Area:
             cf.update(dt, player_rect)
         for trap in self.traps:
             trap.update(dt)
+        for br in self.boss_rooms:
+            br.update(dt, player_rect)
 
     # ---- 渲染 ----
 
@@ -148,12 +183,18 @@ class Area:
             self.layer_renderer.render(renderer, camera)
 
     def render_objects(self, surface: pygame.Surface, cam_offset: tuple):
-        """渲染区域内的营地、陷阱、地面掉落物等对象"""
+        """渲染区域内的营地、陷阱、地面掉落物、死亡遗物等对象"""
         for cf in self.campfires:
             cf.render(surface, cam_offset)
         # 地面掉落物（第 6 阶段）
         for di in self.dropped_items:
             di.render(surface, cam_offset)
+        # 死亡遗物（第 8 阶段）
+        if self.death_relic is not None:
+            self.death_relic.render(surface, cam_offset)
+        # 雾门（第 9 阶段）
+        for br in self.boss_rooms:
+            br.render(surface, cam_offset)
 
     def render_foreground(self, renderer, camera):
         if self.layer_renderer:

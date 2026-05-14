@@ -16,8 +16,8 @@
     "defense":  3,
     "speed":    80.0,
 
-    "sight_range":   280.0,
-    "lose_range":    360.0,
+    "sight_range":   364.0,
+    "lose_range":    468.0,
     "attack_range":  260.0,
     "patrol_radius": 32.0,
 

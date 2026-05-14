@@ -8,6 +8,10 @@
 #   - 分配属性点（allocate）
 #   - compute_stats() 将成长属性衍生值同步到 PlayerStats
 #
+# 第 8 阶段改造：
+#   - 新增 level_up_with_souls() 委托给 ProgressionSystem
+#   - 保留所有旧接口（add_exp / exp_to_next 等），向后兼容
+#
 # 与已有系统的关系：
 #   PlayerBuild.growth  ≡  player.growth  （同一 GrowthStats 对象）
 #   PlayerBuild.stats   ≡  player.stats   （同一 PlayerStats 对象）
@@ -129,11 +133,35 @@ class PlayerBuild:
         根据成长属性重新计算 player_stats 的衍生值：
             max_hp      = BASE_HP + vitality 加成
             max_stamina = BASE_STAMINA + endurance 加成
-            atk         = GrowthStats.get_atk_bonus(current_weapon)
-        由 PlayerStats.apply_growth() 实现，此方法是其对外别名。
+            atk         = GrowthStats.get_atk_bonus(current_weapon) + weapon_item_atk
+            armor_defense = 4件护甲防御之和
+
+        第 8.3 阶段修复：若 equipment 存在，走 _sync_stats() 完整路径；
+        否则兜底走 apply_growth()。
         """
-        weapon = getattr(self._player, "weapon", None)
-        self.stats.apply_growth(self.growth, weapon)
+        equipment = getattr(self._player, "equipment", None)
+        if equipment is not None:
+            equipment._sync_stats()
+        else:
+            weapon = getattr(self._player, "weapon", None)
+            self.stats.apply_growth(self.growth, weapon)
+
+    # ----------------------------------------------------------------
+    # 第 8 阶段：通过灵魂碎片升级
+    # ----------------------------------------------------------------
+
+    def level_up_with_souls(self, levels: int = 1) -> int:
+        """
+        消耗灵魂碎片升级（委托给 ProgressionSystem）。
+        返回实际升级的级数。
+        """
+        from systems.progression_system import ProgressionSystem
+        return ProgressionSystem.spend_souls_to_level_up(self._player, levels)
+
+    def get_soul_cost_to_next(self) -> int:
+        """查询升级到下一级所需的灵魂碎片数。"""
+        from systems.progression_system import ProgressionSystem
+        return ProgressionSystem.get_level_cost(self.level + 1)
 
     # ----------------------------------------------------------------
     # 快捷属性读取

@@ -7,6 +7,7 @@
 # =============================================================
 from __future__ import annotations
 from weapons.base_weapon import BaseWeapon, WeaponType
+from weapons.sword_art  import SwordCycloneArt
 
 
 class Sword(BaseWeapon):
@@ -42,3 +43,7 @@ class Sword(BaseWeapon):
     _active_f_heavy = 8
 
     _light_combo_mult = (1.0, 1.1, 1.3)
+
+    def __init__(self):
+        super().__init__()
+        self.weapon_art_obj = SwordCycloneArt()

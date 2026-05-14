@@ -1,0 +1,110 @@
+{
+  "_comment": "腐骨公爵 Duke Rotbone — 古墓地带 Boss",
+
+  "id": "duke_rotbone",
+  "display_name": "腐骨公爵",
+  "title": "墓地领主",
+
+  "render": {
+    "width": 48,
+    "height": 64,
+    "color": [100, 160, 80]
+  },
+
+  "stats": {
+    "max_hp": 800,
+    "atk": 35,
+    "defense": 15,
+    "speed": 100.0,
+
+    "sight_range": 500.0,
+    "attack_range": 80.0,
+    "patrol_radius": 0.0,
+
+    "element_tags": ["undead", "boss"],
+    "weaknesses": ["holy"],
+    "resistances": ["dark", "poison"],
+    "immunities": [],
+
+    "max_poise": 80.0,
+    "bleed_threshold": 200.0
+  },
+
+  "phase_two": {
+    "_comment": "HP ≤ 50% 时触发",
+    "hp_threshold_pct": 0.5,
+    "speed_mult": 1.3,
+    "atk_mult": 1.2,
+    "new_skill": "toxic_ground"
+  },
+
+  "revive": {
+    "_comment": "首次死亡后复活一次",
+    "revive_hp_pct": 0.6,
+    "revive_delay": 3.0
+  },
+
+  "skills": [
+    {
+      "id": "bone_slash",
+      "name": "骨刃斩",
+      "description": "中距离横斩",
+      "damage_mult": 1.0,
+      "knockback": 200.0,
+      "poise_damage": 25.0,
+      "cooldown": 1.5,
+      "windup_frames": 20,
+      "active_frames": 8,
+      "hitbox": {"w": 70, "h": 50, "offset_x": 30, "offset_y": -10},
+      "element": "physical"
+    },
+    {
+      "id": "poison_breath",
+      "name": "毒雾吐息",
+      "description": "前方扇形毒雾喷射",
+      "damage_mult": 0.8,
+      "knockback": 100.0,
+      "poise_damage": 10.0,
+      "cooldown": 5.0,
+      "windup_frames": 30,
+      "active_frames": 15,
+      "hitbox": {"w": 140, "h": 60, "offset_x": 40, "offset_y": -20},
+      "element": "poison",
+      "status_buildup": {"type": "poison", "value": 40.0}
+    },
+    {
+      "id": "summon_skeleton",
+      "name": "召唤骷髅",
+      "description": "召唤 2 名骷髅兵",
+      "damage_mult": 0.0,
+      "knockback": 0.0,
+      "poise_damage": 0.0,
+      "cooldown": 12.0,
+      "windup_frames": 35,
+      "active_frames": 1,
+      "hitbox": {"w": 0, "h": 0, "offset_x": 0, "offset_y": 0},
+      "element": "none"
+    },
+    {
+      "id": "toxic_ground",
+      "name": "毒沼",
+      "description": "【二阶段】在地面生成持续毒池",
+      "damage_mult": 0.5,
+      "knockback": 0.0,
+      "poise_damage": 5.0,
+      "cooldown": 6.0,
+      "windup_frames": 25,
+      "active_frames": 30,
+      "hitbox": {"w": 160, "h": 30, "offset_x": 0, "offset_y": 30},
+      "element": "poison",
+      "status_buildup": {"type": "poison", "value": 60.0}
+    }
+  ],
+
+  "drop_table": "boss_basic",
+  "boss_soul": {
+    "item_id": "boss_soul_duke",
+    "name": "腐骨之灵",
+    "soul_value": 5000
+  }
+}

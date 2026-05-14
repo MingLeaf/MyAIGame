@@ -251,56 +251,63 @@ class ItemDatabase:
         from weapons.dagger     import Dagger
         from weapons.holy_tome  import HolyTome
 
+        sword_obj = Sword()
         self.register(WeaponItem(
             item_id     = "sword_iron",
             name        = "铁制骑士剑",
-            description = "标准骑士剑，攻守均衡。",
+            description = "标准骑士剑，攻守均衡。战技：旋风斩 — 360度旋转斩击，打飞周围敌人。",
             icon_id     = 10,
             weight      = 3.0,
-            base_atk    = 25,
+            base_atk    = 22,
             str_scale   = 0.5,
             dex_scale   = 0.5,
-            weapon_art  = "盾击",
-            weapon_obj  = Sword(),
+            weapon_art  = "旋风斩",
+            weapon_obj  = sword_obj,
         ))
 
+        from weapons.greatsword import Greatsword
+        gs_obj = Greatsword()
         self.register(WeaponItem(
             item_id     = "greatsword_iron",
             name        = "铁制大剑",
-            description = "沉重的大剑，一击可撼动盾牌。",
+            description = "沉重的大剑，一击可撼动盾牌。战技：天崩地裂 — 跳起重劈，震地击晕。",
             icon_id     = 11,
             weight      = 6.0,
             base_atk    = 45,
             str_scale   = 0.8,
             dex_scale   = 0.0,
-            weapon_art  = "战吼",
-            weapon_obj  = Greatsword(),
+            weapon_art  = "天崩地裂",
+            weapon_obj  = gs_obj,
         ))
 
+        from weapons.dagger import Dagger
+        dagger_obj = Dagger()
         self.register(WeaponItem(
             item_id     = "dagger_bone",
             name        = "骨刃匕首",
-            description = "轻巧短刃，连击速度极快，易造成流血。",
+            description = "轻巧短刃，连击速度极快，易造成流血。战技：幻影步 — 瞬移至敌人身后背刺。",
             icon_id     = 12,
             weight      = 1.0,
             base_atk    = 15,
             str_scale   = 0.0,
             dex_scale   = 0.8,
-            weapon_art  = "背刺",
-            weapon_obj  = Dagger(),
+            weapon_art  = "幻影步",
+            weapon_obj  = dagger_obj,
         ))
 
+        from weapons.holy_tome import HolyTome
+        holy_obj = HolyTome()
         self.register(WeaponItem(
             item_id     = "holy_tome_basic",
             name        = "信徒圣典",
-            description = "信仰者的圣经，可施展神圣奇迹。",
+            description = "信仰者的圣经，可施展神圣奇迹。战技：神圣之光 — 释放冲击波+自我治疗。",
             icon_id     = 13,
             weight      = 1.5,
             base_atk    = 5,
             str_scale   = 0.0,
             dex_scale   = 0.0,
             weapon_art  = "神圣之光",
-            weapon_obj  = HolyTome(),
+            weapon_obj  = holy_obj,
         ))
 
 

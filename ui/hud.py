@@ -102,3 +102,13 @@ class HUD:
             state_surf = font.render(
                 f"State: {player.current_state}", True, (180, 180, 100))
             surface.blit(state_surf, (BAR_X, BAR_Y_START - 22))
+
+        # ---- 第 8 阶段：灵魂碎片 + 等级显示（右下角）----
+        soul_font = get_font(22)
+        level = getattr(player.build, "level", 1) if hasattr(player, "build") else 1
+        souls = getattr(player, "soul_fragments", 0)
+        soul_text = f"◇ {souls}    Lv.{level}"
+        soul_surf = soul_font.render(soul_text, True, (200, 220, 255))
+        sx = SCREEN_WIDTH - soul_surf.get_width() - 20
+        sy = SCREEN_HEIGHT - soul_surf.get_height() - 14
+        surface.blit(soul_surf, (sx, sy))

@@ -1,0 +1,37 @@
+{
+    "_meta": {
+        "description": "武器强化消耗表（材料 + 灵魂碎片）",
+        "_note": "+1~+5 只需灵魂碎片；+6~+10 需要路线材料。route_branch_level=5 表示 +5 后可分路线。"
+    },
+    "route_branch_level": 5,
+    "materials": {
+        "sharp": {
+            "item_id": "material_sharp_stone",
+            "name": "锋锐石"
+        },
+        "heavy": {
+            "item_id": "material_heavy_chunk",
+            "name": "厚重矿块"
+        },
+        "blessed": {
+            "item_id": "material_holy_water",
+            "name": "圣水"
+        },
+        "elemental": {
+            "item_id": "material_element_core",
+            "name": "元素核心"
+        }
+    },
+    "levels": [
+        {"level": 1,  "souls": 80,   "material_qty": 0},
+        {"level": 2,  "souls": 160,  "material_qty": 0},
+        {"level": 3,  "souls": 280,  "material_qty": 0},
+        {"level": 4,  "souls": 450,  "material_qty": 0},
+        {"level": 5,  "souls": 680,  "material_qty": 0},
+        {"level": 6,  "souls": 960,  "material_qty": 1},
+        {"level": 7,  "souls": 1300, "material_qty": 1},
+        {"level": 8,  "souls": 1720, "material_qty": 2},
+        {"level": 9,  "souls": 2220, "material_qty": 2},
+        {"level": 10, "souls": 2800, "material_qty": 3}
+    ]
+}

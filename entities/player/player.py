@@ -133,6 +133,9 @@ class Player(BaseEntity):
         # 受击计时器（> 0 表示处于硬直中）
         self.hurt_timer: float = 0.0
 
+        # 灵魂碎片（第 8 阶段：击败敌人 + 捡回遗物累积）
+        self.soul_fragments: int = 0
+
         # 攻击判定框列表
         self.active_hitboxes: List[AttackHitbox] = []
 
@@ -285,7 +288,11 @@ class Player(BaseEntity):
         """
         ok = self.growth.allocate(attr, points)
         if ok:
-            self.stats.apply_growth(self.growth, self.weapon)
+            # 走完整同步（含 weapon_item_atk + armor_defense）
+            if self.equipment is not None:
+                self.equipment._sync_stats()
+            else:
+                self.stats.apply_growth(self.growth, self.weapon)
             event_manager.emit("player_stat_changed", {
                 "attr": attr, "value": getattr(self.growth, attr)
             })

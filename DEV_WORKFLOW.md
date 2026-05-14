@@ -5,7 +5,7 @@
 
 ---
 
-## 一、当前工程状态总结（截至第 7 阶段完成）
+## 一、当前工程状态总结（截至第 9 阶段完成）
 
 ### 1.1 已完成阶段
 
@@ -18,6 +18,8 @@
 | 第 5 阶段 | 武器系统（8 类武器 + 词条 + 战技 + 强化） | ✅ 完成 |
 | 第 6 阶段 | 物品与背包系统（消耗品/套装/掉落/拾取） | ✅ 完成 |
 | 第 7 阶段 | 敌人 AI 系统（7 类敌人 + 五态闭环 + 数据驱动） | ✅ 完成 |
+| 第 8 阶段 | 游戏规则核心（灵魂碎片/死亡复活/营地/升级/强化/进度） | ✅ 完成 |
+| 第 9 阶段 | Boss 系统（BaseBoss + 腐骨公爵 + 雾门 + 血条 + BossScene） | ✅ 完成 |
 
 ### 1.2 实际目录结构（已实现的关键模块）
 
@@ -51,13 +53,15 @@ items/       item_base / consumable / weapon / armor / item_database / item_mana
              equipment/{set_bonus}
              special/{boss_soul, upgrade_material}
 player/      inventory / equipment / player_build（旧版命名空间，沿用）
-systems/     loot_system (NEW Stage7)
+systems/     loot_system (Stage7)
+             soul_fragment_system / respawn_system / campfire_system
+             progression_system / upgrade_system / quest_system (NEW Stage8)
 ui/          font_manager / hud / inventory_screen / equipment_screen
 scenes/      base_scene / main_menu_scene / game_scene / pause_scene
 data/
   maps/area_graveyard/{tilemap, enemy_spawns}.json (NEW Stage7)
   maps/world_config.json
-  balance/{damage_formula, status_effect_values, loot_tables}.json
+  balance/{damage_formula, status_effect_values, loot_tables, level_curve, upgrade_cost}.json (level_curve/upgrade_cost NEW Stage8)
   weapons/upgrade_curve.json
   weapons/{sword,greatsword,dagger,spear,axe,staff,holy_tome,bow}_list.json
   items/{consumables, armors, upgrade_materials}.json
@@ -173,6 +177,153 @@ data/
    - 13 个敌人按难度梯度从左到右递增（infantry → archer → undead → beast → mage）
    - 弓箭手 / 法师正确站在指定平台上（已 60 帧物理验证）
 3. **冒烟测试**：`_test_stage7_map_redesign.py` 7 组验证全部通过
+
+### 1.3.9 第 8 阶段实施摘要（游戏规则核心系统）
+
+1. **灵魂碎片系统**（`systems/soul_fragment_system.py`）
+   - `SoulFragmentSystem.grant_for_enemy(player, enemy)`：敌人死亡 → 按类型/等级倍率自动入账
+   - `DeathRelic`：玩家死亡时在死亡位置生成脉动光球（含全部碎片），渲染多圈光晕
+   - `create_death_relic` → 旧遗物自动消失；`try_pickup_relic` → 玩家走入半径捡回
+   - 事件：`soul_fragments_changed` / `death_relic_spawned` / `death_relic_recovered`
+
+2. **复活系统**（`systems/respawn_system.py`）
+   - `RespawnSystem.handle_death(player, area)`：完整死亡→复活闭环
+   - 流程：保留旧位置 → 查最近营地 → 传送玩家 → 恢复 HP/Mana/Stamina → 补消耗品 → 重置敌人 → 在旧位置创建遗物
+   - 确保遗物在 `area.reload()` 之后创建，不被清除
+
+3. **营地系统**（`systems/campfire_system.py`）
+   - 激活时注册到全局（`CampfireSystem.activate`）
+   - `rest(player, area)`：回满 HP/Mana/Stamina + 补满限定消耗品 + 重置全部敌人
+   - 补满逻辑遍历 `_REFILLABLE_IDS` 集合，从 `item_db` 读 `max_stack`
+   - `get_transport_targets(current_id)`：返回可传送营地列表
+
+4. **升级系统**（`systems/progression_system.py`）
+   - 数据驱动：`data/balance/level_curve.json`（Lv1~50，base=120, exponent=1.38）
+   - `spend_souls_to_level_up(player, levels)`：逐级扣灵魂碎片，调用 `build._level_up()`
+   - 每级获得 1 属性点，由玩家通过 `allocate_attribute` 分配
+
+5. **强化系统**（`systems/upgrade_system.py`）
+   - 包装 `weapons/weapon_upgrade.py` 的数值计算，增加成本校验 + 材料扣除
+   - 数据驱动：`data/balance/upgrade_cost.json`（+1~+10 费用；4 路线材料）
+   - `upgrade_weapon(player, weapon, route)`：扣灵魂碎片 + 材料 → 调用底层强化
+   - +1~+5 仅灵魂碎片；+6~+10 加材料；+5 分路线
+
+6. **进度系统**（`systems/quest_system.py`）
+   - 追踪 Boss 击杀 / 区域解锁 / 营地激活
+   - `record_boss_kill` 自动解锁下一区域
+   - `progress_summary()` 返回完整进度字典（供存档使用）
+
+7. **HUD 增强**（`ui/hud.py`）
+   - 右下角显示：`◇ {souls}    Lv.{level}`
+
+8. **Player 增强**（`entities/player/player.py`）
+   - 新增 `soul_fragments: int = 0` 字段
+
+9. **改造清单**
+   - `map/campfire.py`：`try_activate` 接入 `CampfireSystem.activate` + `rest`
+   - `map/area.py`：新增 `death_relic` 字段 + 渲染 + reload 时保留遗物
+   - `scenes/game_scene.py`：死亡检测 → 自动复活；遗物更新+捡回；灵魂飘字；灵魂碎片入账
+   - `player/player_build.py`：新增 `level_up_with_souls()` / `get_soul_cost_to_next()` 委托
+
+10. **冒烟测试** `_test_stage8_core_systems.py` 10 组全部通过；回归测试 `_test_stage8_regression.py` 24 项零破坏
+
+### 1.3.10 第 8.1 阶段补充（死亡 UI + 营地菜单 + 战技补全）
+
+1. **死亡界面**（`ui/death_screen.py`）
+   - 全屏黑底渐显 + "你已陨落" 大标题 + 灵魂碎片遗失提示
+   - 按 E 从最近营地复活（调用 `RespawnSystem.handle_death`）
+   - 按 ESC 回到主菜单
+   - `GameScene` 在玩家 HP=0 时先创建遗物 → 显示死亡界面 → 暂停游戏
+   - 复活时传送 + 恢复 + 补消耗品 + 敌人重置
+
+2. **营地菜单**（`ui/campfire_menu.py`）
+   - F 靠近营地 → 激活 + 打开菜单（暂停游戏）
+   - 4 个菜单项：升级 / 武器强化 / 休息 / 离开
+   - 升级面板：显示 Lv + 灵魂数 + 成本，按 1~6 分配 6 项属性，按 Enter 消耗灵魂升级
+   - 强化面板：显示武器 +N 信息 + 下一级成本，按 Enter 强化
+   - W/S 上下选择，Enter 确认，ESC/F 返回
+
+3. **战技补全**（4 个旧武器添加战技）
+   - `Sword`：旋风斩（`sword_art.py`）— 360° 大范围击飞
+   - `Dagger`：幻影步（`dagger_art.py`）— 闪现至最近敌人身后背刺
+   - `Greatsword`：天崩地裂（`greatsword_art.py`）— 超大范围震地强击晕
+   - `HolyTome`：神圣之光（`holy_tome_art.py`）— 神圣冲击波 + 自我治疗 25% HP
+   - `item_database.py` 中 WeaponItem 的 `weapon_obj` 同步更新（描述也更新）
+
+4. **冒烟测试** `_test_stage8_fixes.py` 三项全部通过
+
+### 1.3.11 第 8.2 阶段修复（武器升级伤害同步 + 营地逻辑 + UI 优化）
+
+1. **武器升级伤害同步修复**（`systems/upgrade_system.py`）
+   - 问题：升级后 `stats.atk` 仅通过 `apply_growth()` 更新，缺少 `weapon_item_atk` 增量
+   - 修复：若 `player.equipment` 存在，调用 `equipment._sync_stats()` 走完整同步路径
+
+2. **营地交互分离修复**（`map/campfire.py` + `systems/campfire_system.py` + `ui/campfire_menu.py`）
+   - 问题：F 键激活营地自动重置怪物（不符合类魂惯例：应选择休息才重置）
+   - 修复：`Campfire.try_activate` 仅激活+注册；`CampfireSystem.rest` 不再重置敌人
+   - 怪物重置移至 `CampfireMenu._do_rest()`：菜单选择"休息" → 回满 + 补消耗品 + 重置
+
+3. **HUD 提示更新**（`scenes/game_scene.py`）
+   - 第二行提示增加 `U: 战技`
+
+4. **灵魂飘字位置修正**（`scenes/game_scene.py`）
+   - 问题：击杀怪物后灵魂飘字在玩家头顶（需走到敌人才看到）
+   - 修复：`source="enemy"` 的灵魂变化跳过 `_on_soul_fragments_changed`（已在 `_on_enemy_dead` 的敌人死亡位置显示）
+
+5. **升级面板属性描述**（`ui/campfire_menu.py`）
+   - 六项属性添加作用描述：力量→重型武器伤害↑…耐性→最大耐力↑负重↑
+   - 面板尺寸从 500×440 → 540×520，每行高 52px 容纳双行文字
+
+6. **验证测试** `_test_stage8_fixes2.py` 全部通过
+
+### 1.3.12 第 8.3 阶段修复（死亡界面 + 消耗品验证）
+
+1. **死亡界面不出现修复**（`entities/player/player_combat.py` + `scenes/game_scene.py`）
+   - 根因：`PlayerCombat.take_damage` 在 HP=0 时提前将 FSM 切换到 Dead → `GameScene.update` 中 `not self._player.is_dead` 为 False → 死亡界面从不触发
+   - 修复：`PlayerCombat.take_damage` 不再切换 Dead（仅发射 `player_death` 事件）；`GameScene.update` 改为 `not self._death_paused` 判断，并自行设置 Dead 状态
+
+2. **消耗品功能验证**（新增 `_test_consumables.py`）
+   - 骷髅骨灰等 SpecialItem 的 `use()` 方法正常，通过背包 `use_item` 能正确触发对应事件
+   - 毒飞镖发射抛射物、传送石发送事件、Buff 类消耗品均正常
+   - 未注册的消耗品 ID（如 `heal_potion_great` 等）确认为 JSON 中未配置，非 bug
+
+### 1.3.13 第 8.4 阶段修复（升级后攻防数值同步）
+
+**根因**：与武器升级问题同源——`Player.allocate_stat()` 和 `PlayerBuild.compute_stats()` 只调用 `stats.apply_growth()`，缺失 `Equipment._sync_stats()` 中的两步：
+  - `stats.armor_defense / magic_res_bonus` 设置
+  - `stats.atk += weapon_item_atk`（武器物品的基础攻击力）
+
+**修复**（2 处）：
+  - `entities/player/player.py` `allocate_stat()`：若 `equipment` 存在 → 走 `equipment._sync_stats()`，否则兜底 `apply_growth()`
+  - `player/player_build.py` `compute_stats()`：同上逻辑
+
+**验证**：体魄+2→HP 100→130；力量+2→ATK 包含 weapon_item_atk；防御 23 保持；`atk = growth.get_atk_bonus + weapon_item_atk` 公式正确
+
+### 1.3.14 古墓地图 v3（营地安全区 + 扩大场景）
+
+**变更**：
+  - 地图从 80×22 → **100×22**（3200×704 px），增加 20 列空间
+  - 3 个营地周围建立 **安全区**（≥5 列无敌人）：
+    - cf_01 (col 7):  cols 1-15 安全区，最近敌人 col 20
+    - cf_02 (col 56): cols 48-63 安全区，最近敌人 col 45
+    - cf_03 (col 92): cols 85-99 安全区，最近敌人 col 82/87
+  - 13 名敌人数量不变，位置重新分布保持难度梯度
+  - 平台 v2 调整为适配 100 列宽度，所有平台垂直差 3 行 (96px) ≤ 跳跃极限 4 行 (128px)
+  - 传送门迁至 col 96
+
+**验证** `_test_map_v3.py`：营地安全区、敌人数量、JSON 格式全部通过
+
+### 1.3.15 第 9 阶段实施摘要（Boss 系统）
+
+1. **数据文件** `data/entities/bosses/duke_rotbone.json`
+2. **Boss 基类** + **腐骨公爵** `entities/enemy/bosses/`
+3. **雾门** `map/boss_room.py`
+4. **Boss 血条** `ui/boss_healthbar.py`
+5. **Boss 场景** `scenes/boss_scene.py`
+6. **集**成 Area + GameScene
+7. **测试** `_test_stage9_boss.py` 11 组通过，回归 24/24
+
+### 1.4 关键设计约定
 
 ### 1.4 关键设计约定（后续阶段必须遵守）
 
@@ -353,7 +504,9 @@ data/
 
 ---
 
-### 窗口 4 · 第 8 阶段：游戏规则核心系统
+### 窗口 4 · 第 8 阶段：游戏规则核心系统 ✅ 已完成
+
+> 实施摘要见 §1.3.9。冒烟测试脚本：`_test_stage8_core_systems.py`，回归测试：`_test_stage8_regression.py`
 
 **本次任务**：实现类魂核心闭环——灵魂碎片掉落/捡回、营地复活、属性升级、武器强化、任务进度。
 

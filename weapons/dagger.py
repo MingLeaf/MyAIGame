@@ -7,6 +7,7 @@
 # =============================================================
 from __future__ import annotations
 from weapons.base_weapon import BaseWeapon, WeaponType, AttackData
+from weapons.dagger_art import DaggerPhantomStepArt
 
 
 class Dagger(BaseWeapon):
@@ -48,3 +49,7 @@ class Dagger(BaseWeapon):
     # 流血积累：匕首高流血，每次轻攻击命中积累 40
     _bleed_stack_light  = 40.0
     _poison_stack_light = 15.0   # 轻微毒积累
+
+    def __init__(self):
+        super().__init__()
+        self.weapon_art_obj = DaggerPhantomStepArt()

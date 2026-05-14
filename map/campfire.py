@@ -59,20 +59,37 @@ class Campfire:
 
         self._near_player = self.interact_rect.colliderect(player_rect)
 
-    def try_activate(self, player_rect: pygame.Rect) -> bool:
+    def try_activate(self, player_rect: pygame.Rect,
+                      player=None, area=None) -> bool:
         """
         玩家按交互键时调用。
         若在范围内则激活篝火并发布事件，返回 True。
+
+        第 8.1 阶段：
+          - 首次激活：注册到 CampfireSystem（全局营地网络）
+          - 不再自动触发休息（由 CampfireMenu 的"休息"选项显式触发）
+          - 不重置敌人
         """
         if not self._near_player:
             return False
+
+        was_activated = self.activated
         if not self.activated:
             self.activated = True
-        # 每次交互都发布激活事件（允许重复激活以补充消耗品）
+
+        # 注册到全局营地系统（传入 area_id 以便传送网络工作）
+        area_id = ""
+        if area is not None:
+            area_id = getattr(area, "area_id", "")
+        from systems.campfire_system import CampfireSystem
+        CampfireSystem.activate(self.campfire_id, area_id, self.x, self.y)
+
+        # 发布激活事件（不再自动触发休息/重置敌人）
         event_manager.emit("campfire_activated", {
             "campfire_id": self.campfire_id,
             "x": self.x,
             "y": self.y,
+            "first_time": not was_activated,
         })
         return True
 

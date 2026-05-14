@@ -161,7 +161,8 @@ class PlayerCombat:
 
         # 5. 状态切换
         if p.stats.is_dead:
-            p.fsm.change_state("Dead")
+            # 死亡由 GameScene 的 update 循环统一处理（显示死亡界面等）
+            # 此处不切换状态，仅发射事件
             event_manager.emit("player_death", {"x": p.x, "y": p.y})
         elif actual > 0:
             p.fsm.change_state("Hurt")

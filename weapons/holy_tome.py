@@ -7,6 +7,7 @@
 # =============================================================
 from __future__ import annotations
 from weapons.base_weapon import BaseWeapon, WeaponType, AttackData
+from weapons.holy_tome_art import HolyTomeLightArt
 
 
 class HolyTome(BaseWeapon):
@@ -44,3 +45,7 @@ class HolyTome(BaseWeapon):
     _light_combo_mult   = (1.0, 1.1, 1.2)
     _bleed_stack_light  = 0.0
     _poison_stack_light = 0.0
+
+    def __init__(self):
+        super().__init__()
+        self.weapon_art_obj = HolyTomeLightArt()
