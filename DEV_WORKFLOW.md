@@ -5,7 +5,7 @@
 
 ---
 
-## 一、当前工程状态总结（截至第 9 阶段完成）
+## 一、当前工程状态总结（截至第 10 阶段完成）
 
 ### 1.1 已完成阶段
 
@@ -20,11 +20,13 @@
 | 第 7 阶段 | 敌人 AI 系统（7 类敌人 + 五态闭环 + 数据驱动） | ✅ 完成 |
 | 第 8 阶段 | 游戏规则核心（灵魂碎片/死亡复活/营地/升级/强化/进度） | ✅ 完成 |
 | 第 9 阶段 | Boss 系统（BaseBoss + 腐骨公爵 + 雾门 + 血条 + BossScene） | ✅ 完成 |
+| 第 10 阶段 | NPC 与对话系统（营地NPC/铁匠/商人/对话引擎） | ✅ 完成 |
 
 ### 1.2 实际目录结构（已实现的关键模块）
 
 ```
 core/        scene_manager / event_manager / camera / input_handler / clock / renderer / game
+             dialogue_engine（NEW Stage10）
 utils/       state_machine / json_loader / resource_cache / timer / debug / color / math_utils / rect_utils
 physics/     gravity / collision_detector / movement_resolver / projectile
 map/         tile / tile_map / collision_map / layer_renderer / platform / trap / transition_gate
@@ -38,6 +40,8 @@ entities/
              types/{infantry, heavy_armor, undead, beast,
                    archer, mage, elite}（NEW Stage7，全部数据驱动）
              types/_data_loader（共享 JSON 加载工具）
+             bosses/{base_boss, duke_rotbone}（NEW Stage9）
+  npc/       base_npc / keeper / blacksmith / merchant（NEW Stage10）
 combat/      damage_calculator / hit_resolver / floating_text / drop_system
              status_effect / status_manager
              hitbox / knockback / poise_system
@@ -57,6 +61,8 @@ systems/     loot_system (Stage7)
              soul_fragment_system / respawn_system / campfire_system
              progression_system / upgrade_system / quest_system (NEW Stage8)
 ui/          font_manager / hud / inventory_screen / equipment_screen
+             death_screen / campfire_menu / dialogue_box（NEW Stage10）
+             boss_healthbar（NEW Stage9）
 scenes/      base_scene / main_menu_scene / game_scene / pause_scene
 data/
   maps/area_graveyard/{tilemap, enemy_spawns}.json (NEW Stage7)
@@ -67,6 +73,7 @@ data/
   items/{consumables, armors, upgrade_materials}.json
   entities/enemies/{infantry, heavy_armor, undead, beast,
                     archer, mage, elite}.json (NEW Stage7)
+  dialogues/{npc_keeper, npc_blacksmith, npc_merchant}.json（NEW Stage10）
 ```
 
 ### 1.3 第 4 阶段重构亮点
@@ -867,6 +874,44 @@ data/
 | `core/game.py` | F3 同步 4 标志（删除场景中的冲突处理） |
 | `data/maps/area_graveyard/tilemap.json` | 雾门 col 94→95 |
 | `_test_stage9_boss.py` | atk 期望值 35→23 |
+
+### 1.3.16 古墓地图 v4（第 10 阶段：NPC 安全区扩大）
+
+- 地图从 100×22 → **146×22**（4672×704 px）
+- 每个营地 + NPC 周围 **≥12 格无敌人**，远超敌人索敌半径（~8 格）
+- 3 个 NPC 配置在 tilemap JSON `objects.npcs` 中
+
+### 1.3.17 第 10 阶段实施摘要（NPC 与对话系统）
+
+1. **NPC 基类 + 工厂**（`entities/npc/base_npc.py`）
+2. **3 类 NPC**：守护者艾德 / 铁匠多兰 / 商人莉亚
+3. **对话引擎**（`core/dialogue_engine.py`）：JSON 驱动对话树 + 动作回调
+4. **对话框 UI**（`ui/dialogue_box.py`）：底部面板 + 逐字显示 + W/S/Enter
+5. **游戏内集成**（`scenes/game_scene.py`）：F 键优先级 营地>NPC>雾门
+6. **对话数据**（`data/dialogues/`）：3 份 JSON，含世界观碎片
+7. **Area 集成**：自动从 tilemap JSON 加载 NPC
+8. **冒烟测试** `_test_stage10_npc.py` 10 项全部通过
+
+### 1.3.18 地图 v4.1 修复（深坑 + 铁匠浮空 + 闪退）
+
+1. **深坑修复**：所有 row 17 深坑从最大 10 格缩小至 ≤4 格，确保玩家可安全跳跃
+2. **铁匠 NPC 位置**：从深坑上的 col 67 → 实心地面 col 61
+3. **平台敌人修正**：archer col 48 row 13（浮空）→ col 27 row 13（站在 row 14 平台）
+4. **闪退修复**：`DialogueBox.handle_event` 中 `select_choice` 回调同步关闭对话后增加 `engine is None` 检查，防止 `AttributeError`
+
+### 1.3.19 地图 v4.2 + 坠落死亡 + 对话安全增强
+
+1. **铁匠位置**：col 61 → col 69（营地 cf_02 col70 左侧悬崖边，营地最近侧）
+2. **商人闪退防护**：`DialogueBox.render/update` 增加 `self._engine is None` 守卫
+3. **坠落死亡**：玩家 y > `world_bounds.bottom + 128px` 时触发即死
+4. **对话结束后暂停修复**：`DialogueBox.close()` 发布 `dialogue_closed` 事件，`GameScene` 订阅后清除 `_dialogue_paused`
+5. **异常容错**：4 个 NPC 事件处理器 + `DialogueEngine.select_choice` 加 try-except+traceback
+
+### 1.3.20 调试模式默认关闭 + 对话日志
+
+1. **调试模式**：`config.DEBUG_MODE = False`，按 F3 手动开启
+2. **对话日志**：`dialogue_box.py` / `dialogue_engine.py` / `game_scene.py` 十处关键路径加 `logging.getLogger("dialogue")` 日志
+3. **调试启动器**：`__debug_dialogue.py` 将日志写入 `__dialogue_log.txt`
 
 ---
 

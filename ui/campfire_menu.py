@@ -52,6 +52,7 @@ class CampfireMenu:
         self._menu_items = [
             ("升级",     "level_up"),
             ("武器强化", "weapon_upgrade"),
+            ("传送",     "teleport"),
             ("休息",     "rest"),
             ("离开",     "leave"),
         ]
@@ -64,6 +65,11 @@ class CampfireMenu:
         # 武器强化子面板
         self._show_weapon_panel: bool = False
 
+        # 传送子面板（第 10 阶段）
+        self._show_teleport_panel: bool = False
+        self._teleport_targets: list = []
+        self._teleport_selected: int = 0
+
         # 消息提示
         self._message: str = ""
         self._msg_timer: float = 0.0
@@ -74,6 +80,9 @@ class CampfireMenu:
         self._selected = 0
         self._show_upgrade_panel = False
         self._show_weapon_panel = False
+        self._show_teleport_panel = False
+        self._teleport_targets = []
+        self._teleport_selected = 0
         self._message = ""
         self._msg_timer = 0.0
 
@@ -97,6 +106,10 @@ class CampfireMenu:
         # ---- 武器强化面板输入 ----
         if self._show_weapon_panel:
             return self._handle_weapon_input(event)
+
+        # ---- 传送面板输入（第 10 阶段）----
+        if self._show_teleport_panel:
+            return self._handle_teleport_input(event)
 
         # ---- 主菜单输入 ----
         if event.key == pygame.K_w or event.key == pygame.K_UP:
@@ -127,6 +140,9 @@ class CampfireMenu:
             self._upgrade_selected = 0
         elif action == "weapon_upgrade":
             self._show_weapon_panel = True
+        elif action == "teleport":
+            self._show_teleport_panel = True
+            self._load_teleport_targets()
         elif action == "rest":
             self._do_rest()
         elif action == "leave":
@@ -247,6 +263,9 @@ class CampfireMenu:
         if self._show_weapon_panel:
             self._render_weapon_panel(surface, p)
             return
+        if self._show_teleport_panel:
+            self._render_teleport_panel(surface, p)
+            return
 
         # ---- 半透明遮罩 ----
         overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
@@ -254,7 +273,7 @@ class CampfireMenu:
         surface.blit(overlay, (0, 0))
 
         # ---- 菜单面板（居中）----
-        pw, ph = 360, 320
+        pw, ph = 360, 380
         px = (SCREEN_WIDTH - pw) // 2
         py = (SCREEN_HEIGHT - ph) // 2
 
@@ -289,12 +308,12 @@ class CampfireMenu:
             if wpn_route != "none":
                 wpn_info += f" ({route_cn.get(wpn_route, wpn_route)})"
             wpn_surf = info_font.render(wpn_info, True, (220, 200, 150))
-            surface.blit(wpn_surf, (px + 20, py + 135))
+            surface.blit(wpn_surf, (px + 20, py + 128))
 
         # 菜单项
-        menu_font = get_font(24)
+        menu_font = get_font(22)
         for i, (label, _) in enumerate(self._menu_items):
-            y = py + 175 + i * 34
+            y = py + 165 + i * 32
             if i == self._selected:
                 # 高亮背景
                 pygame.draw.rect(surface, (60, 55, 80),
@@ -451,4 +470,125 @@ class CampfireMenu:
             msg_font = get_font(18)
             color = (120, 240, 140) if "成功" in self._message else (240, 140, 140)
             msg_surf = msg_font.render(self._message, True, color)
+            surface.blit(msg_surf, (px + pw // 2 - msg_surf.get_width() // 2, py + ph - 20))
+
+    # ----------------------------------------------------------------
+    # 传送面板（第 10 阶段）
+    # ----------------------------------------------------------------
+
+    def _load_teleport_targets(self):
+        """从 CampfireSystem 加载可传送的营地列表，并注入友好名称。"""
+        from systems.campfire_system import CampfireSystem
+        self._teleport_targets = CampfireSystem.get_transport_targets(None)
+        # 补充友好名称
+        import json, os
+        from config import DATA_DIR
+        wc_path = os.path.join(DATA_DIR, "maps", "world_config.json")
+        area_names = {}
+        if os.path.isfile(wc_path):
+            try:
+                with open(wc_path, encoding="utf-8") as f:
+                    wc = json.load(f)
+                for a in wc.get("areas", []):
+                    area_names[a["id"]] = a.get("name", a["id"])
+            except Exception:
+                pass
+        for t in self._teleport_targets:
+            t["name"] = area_names.get(t["area_id"], t.get("campfire_id", "?"))
+        self._teleport_selected = 0
+
+    def _handle_teleport_input(self, event) -> bool:
+        if event.key == pygame.K_ESCAPE:
+            self._show_teleport_panel = False
+            return True
+        if event.key in (pygame.K_w, pygame.K_UP):
+            if self._teleport_targets:
+                self._teleport_selected = (self._teleport_selected - 1) % len(self._teleport_targets)
+            return True
+        if event.key in (pygame.K_s, pygame.K_DOWN):
+            if self._teleport_targets:
+                self._teleport_selected = (self._teleport_selected + 1) % len(self._teleport_targets)
+            return True
+        if event.key in (pygame.K_RETURN, pygame.K_SPACE):
+            return self._do_teleport()
+        return True
+
+    def _do_teleport(self) -> bool:
+        if not self._teleport_targets or self._player is None:
+            return True
+        target = self._teleport_targets[self._teleport_selected]
+        target_area = target.get("area_id", "")
+
+        if not target_area:
+            self._message = "传送失败：无效目标"
+            self._msg_timer = 1.5
+            return True
+
+        # 检查目标区域地图文件存在
+        import os
+        from config import DATA_DIR
+        map_dir = os.path.join(DATA_DIR, "maps", target_area)
+        if not os.path.isdir(map_dir):
+            self._message = f"地图未开放: {target_area}"
+            self._msg_timer = 1.5
+            return True
+
+        # 先休息再传送（第 10 阶段）
+        from systems.campfire_system import CampfireSystem
+        CampfireSystem.rest(self._player, area=None)
+
+        # 关闭菜单
+        self.visible = False
+        self._show_teleport_panel = False
+
+        # 切换到目标区域
+        from core.scene_manager import scene_manager
+        from scenes.game_scene import GameScene
+        scene_manager.replace(GameScene(area_id=target_area))
+        return True
+
+    def _render_teleport_panel(self, surface: pygame.Surface, p: "Player") -> None:
+        overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
+        overlay.fill((0, 0, 0, 150))
+        surface.blit(overlay, (0, 0))
+
+        pw, ph = 400, 360
+        px = (SCREEN_WIDTH - pw) // 2
+        py = (SCREEN_HEIGHT - ph) // 2
+
+        pygame.draw.rect(surface, (25, 22, 35), (px, py, pw, ph))
+        pygame.draw.rect(surface, (80, 75, 100), (px, py, pw, ph), 2)
+
+        title_font = get_font(26)
+        title_surf = title_font.render("营地传送", True, UI_HIGHLIGHT)
+        surface.blit(title_surf, (px + pw // 2 - title_surf.get_width() // 2, py + 14))
+
+        if not self._teleport_targets:
+            info_font = get_font(18)
+            surf = info_font.render("暂无已激活的营地可传送", True, (180, 180, 180))
+            surface.blit(surf, (px + 20, py + 80))
+        else:
+            item_font = get_font(20)
+            for i, t in enumerate(self._teleport_targets):
+                y = py + 55 + i * 30
+                cf_name = t.get("name", t.get("campfire_id", "?"))
+                area = t.get("area_id", "?")
+                label = f"{cf_name} ({area})"
+                if i == self._teleport_selected:
+                    pygame.draw.rect(surface, (60, 55, 80), (px + 12, y - 2, pw - 24, 28))
+                    color = UI_HIGHLIGHT
+                    prefix = "▶ "
+                else:
+                    color = (170, 170, 190)
+                    prefix = "   "
+                surf = item_font.render(f"{prefix}{label}", True, color)
+                surface.blit(surf, (px + 24, y))
+
+        hint_font = get_font(16)
+        hint_surf = hint_font.render("W/S: 选择  Enter: 传送  ESC: 返回", True, (150, 150, 170))
+        surface.blit(hint_surf, (px + 20, py + ph - 40))
+
+        if self._message and self._msg_timer > 0:
+            msg_font = get_font(18)
+            msg_surf = msg_font.render(self._message, True, (240, 200, 120))
             surface.blit(msg_surf, (px + pw // 2 - msg_surf.get_width() // 2, py + ph - 20))

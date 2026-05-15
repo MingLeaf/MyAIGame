@@ -1,0 +1,46 @@
+{
+  "start_node": "greeting",
+  "nodes": {
+    "greeting": {
+      "speaker": "守护者 艾德",
+      "text": "又一位流浪者来到烬土……我是守护者艾德，这片古墓的看门人。你需要什么帮助？",
+      "choices": [
+        {"text": "我想提升力量（升级）", "action": "open_level_up", "next": "after_levelup"},
+        {"text": "能送我去其他营地吗？（传送）", "action": "open_teleport", "next": "after_teleport"},
+        {"text": "这里是什么地方？", "action": "chat", "next": "lore_graveyard"}
+      ]
+    },
+    "after_levelup": {
+      "speaker": "守护者 艾德",
+      "text": "灵魂的力量不可小觑。好好利用它，流浪者。还有别的需要吗？",
+      "choices": [
+        {"text": "我还要传送", "action": "open_teleport", "next": "after_teleport"},
+        {"text": "没有了，谢谢", "action": null, "next": null}
+      ]
+    },
+    "after_teleport": {
+      "speaker": "守护者 艾德",
+      "text": "营火之间的联系永不断绝。愿你一路平安。",
+      "choices": [
+        {"text": "我想升级", "action": "open_level_up", "next": "after_levelup"},
+        {"text": "再见了", "action": null, "next": null}
+      ]
+    },
+    "lore_graveyard": {
+      "speaker": "守护者 艾德",
+      "text": "此地曾是一座荣耀的陵墓，安葬着古代的英雄与贤者。但腐骨公爵的诅咒唤醒了死者，如今这里充斥着亡灵。",
+      "choices": [
+        {"text": "腐骨公爵？", "action": "chat", "next": "lore_duke"},
+        {"text": "我需要升级", "action": "open_level_up", "next": "after_levelup"}
+      ]
+    },
+    "lore_duke": {
+      "speaker": "守护者 艾德",
+      "text": "他是被遗忘的领主，受到不死诅咒的侵蚀。击败他，才能打开通往毒沼泽的道路。切记，圣属性武器对他有奇效。",
+      "choices": [
+        {"text": "明白了，我要变强", "action": "open_level_up", "next": "after_levelup"},
+        {"text": "我会小心的", "action": null, "next": null}
+      ]
+    }
+  }
+}

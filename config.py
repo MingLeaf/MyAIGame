@@ -38,6 +38,6 @@ LAYER_PARTICLE    = 35
 LAYER_UI          = 40
 
 # ------- 调试 -------
-DEBUG_MODE         = True    # 全局调试开关
-DEBUG_SHOW_HITBOX  = True    # 显示碰撞框
-DEBUG_SHOW_FPS     = True    # 显示帧率
+DEBUG_MODE         = False   # 全局调试开关（按 F3 切换）
+DEBUG_SHOW_HITBOX  = False   # 显示碰撞框
+DEBUG_SHOW_FPS     = False   # 显示帧率

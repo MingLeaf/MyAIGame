@@ -7,7 +7,7 @@
 #   - 长吟唱（cast_windup 帧）后释放 MagicBall
 #   - 吟唱期间被攻击 → 进入硬直，吟唱被打断
 #   - 头顶吟唱进度条可视化
-#   - 玩家逼近时后撤
+#   - 玩家接近时后撤（吟唱中站定继续施法，不打断）
 # =============================================================
 from __future__ import annotations
 
@@ -75,14 +75,15 @@ class Mage(BaseEnemy):
 
         self.facing = 1 if self.player.x > self.x else -1
 
-        # 玩家太近 → 后撤（吟唱中也被迫中断）
+        # 玩家太近且未吟唱 → 高速后撤
         if dist < self.min_keep_distance and self._cast_phase == CAST_NONE:
-            self.vel_x = -self.facing * self.stats.speed * 0.7
+            self.vel_x = -self.facing * self.stats.speed * 1.2
             return True
 
+        # 玩家太近但正在吟唱 → 边后撤边继续施法（第 10 阶段改进）
         if dist < self.min_keep_distance and self._cast_phase != CAST_NONE:
-            self._reset_cast()
-            self.vel_x = -self.facing * self.stats.speed * 0.7
+            self.vel_x = -self.facing * self.stats.speed * 0.5
+            self._tick_cast()
             return True
 
         if dist > self.max_attack_distance and self._cast_phase == CAST_NONE:

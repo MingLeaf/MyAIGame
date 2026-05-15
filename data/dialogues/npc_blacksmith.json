@@ -1,0 +1,30 @@
+{
+  "start_node": "greeting",
+  "nodes": {
+    "greeting": {
+      "speaker": "铁匠 多兰",
+      "text": "哼，又是个不知死活的冒险者。我是多兰，这荒郊野外唯一的铁匠。想强化武器就说话。",
+      "choices": [
+        {"text": "帮我强化武器", "action": "open_weapon_upgrade", "next": "after_upgrade"},
+        {"text": "你为什么在这里？", "action": "chat", "next": "lore_smith"},
+        {"text": "下次再说", "action": null, "next": null}
+      ]
+    },
+    "after_upgrade": {
+      "speaker": "铁匠 多兰",
+      "text": "一把好武器需要好的材料。等你到了毒沼泽，帮我找些黑曜铁矿来，我能打出更锋利的东西。",
+      "choices": [
+        {"text": "我会留意的", "action": null, "next": null},
+        {"text": "什么是黑曜铁矿？", "action": "chat", "next": "lore_smith"}
+      ]
+    },
+    "lore_smith": {
+      "speaker": "铁匠 多兰",
+      "text": "以前我在王城铁炉堡当锻造师，腐骨公爵的诅咒蔓延后，我逃了出来。这些古墓里的亡灵……太多熟悉的面孔了。",
+      "choices": [
+        {"text": "强化武器", "action": "open_weapon_upgrade", "next": "after_upgrade"},
+        {"text": "保重", "action": null, "next": null}
+      ]
+    }
+  }
+}

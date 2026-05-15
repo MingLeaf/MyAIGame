@@ -3,7 +3,9 @@
 # =============================================================
 
 from __future__ import annotations
-import pygame
+import pygame, logging
+
+_log = logging.getLogger("dialogue")
 
 from scenes.base_scene  import BaseScene
 from core.camera        import Camera
@@ -15,6 +17,8 @@ from ui.inventory_screen  import InventoryScreen
 from ui.equipment_screen  import EquipmentScreen
 from ui.death_screen      import DeathScreen
 from ui.campfire_menu     import CampfireMenu
+from ui.dialogue_box      import DialogueBox
+from core.dialogue_engine import DialogueEngine
 from utils.color        import UI_HIGHLIGHT
 from config             import SCREEN_WIDTH, SCREEN_HEIGHT
 import utils.debug as debug
@@ -71,6 +75,12 @@ class GameScene(BaseScene):
         # ---- Boss 触发标记 ----
         self._boss_triggered: bool = False
 
+        # ---- 第 10 阶段·NPC 与对话系统 ----
+        self._dialogue_box = DialogueBox()
+        self._dialogue_engine: "DialogueEngine" | None = None
+        # 对话暂停标记
+        self._dialogue_paused: bool = False
+
     def on_enter(self):
         pygame.font.init()
         self._hint_font = get_font(18)
@@ -116,6 +126,13 @@ class GameScene(BaseScene):
         event_manager.subscribe("summon_ally",           self._on_summon_ally)
         event_manager.subscribe("player_buff_applied",   self._on_player_buff)
 
+        # ---- 第 10 阶段·NPC 事件 ----
+        event_manager.subscribe("npc_open_level_up",       self._on_npc_open_level_up)
+        event_manager.subscribe("npc_open_teleport",       self._on_npc_open_teleport)
+        event_manager.subscribe("npc_open_weapon_upgrade", self._on_npc_open_weapon_upgrade)
+        event_manager.subscribe("npc_open_shop",           self._on_npc_open_shop)
+        event_manager.subscribe("dialogue_closed",          self._on_dialogue_closed)
+
         self._loaded = True
 
     def on_exit(self):
@@ -131,6 +148,11 @@ class GameScene(BaseScene):
         event_manager.unsubscribe("consumables_refilled",   self._on_consumables_refilled)
         event_manager.unsubscribe("summon_ally",            self._on_summon_ally)
         event_manager.unsubscribe("player_buff_applied",    self._on_player_buff)
+        event_manager.unsubscribe("npc_open_level_up",      self._on_npc_open_level_up)
+        event_manager.unsubscribe("npc_open_teleport",      self._on_npc_open_teleport)
+        event_manager.unsubscribe("npc_open_weapon_upgrade", self._on_npc_open_weapon_upgrade)
+        event_manager.unsubscribe("npc_open_shop",           self._on_npc_open_shop)
+        event_manager.unsubscribe("dialogue_closed",         self._on_dialogue_closed)
 
     def on_resume(self):
         """从 BossScene pop 后恢复：重置雾门触发标记，允许再次进入。"""
@@ -375,6 +397,82 @@ class GameScene(BaseScene):
         )
 
     # ----------------------------------------------------------------
+    # 第 10 阶段·NPC 对话事件处理
+    # ----------------------------------------------------------------
+
+    def _on_npc_open_level_up(self, data: dict) -> None:
+        """守护者：打开升级面板（复用营地菜单的升级子面板）。"""
+        _log.info("NPC_EVENT open_level_up player=%s", self._player is not None)
+        try:
+            if self._player is None:
+                return
+            self._campfire_menu.open(self._player)
+            self._campfire_menu._show_upgrade_panel = True
+            self._dialogue_box.close()
+            self._dialogue_paused = False
+            _log.info("NPC_EVENT open_level_up done")
+        except Exception:
+            import traceback
+            _log.error("NPC_EVENT open_level_up FAILED:\n%s", traceback.format_exc())
+            traceback.print_exc()
+
+    def _on_npc_open_teleport(self, data: dict) -> None:
+        """守护者：打开传送面板。"""
+        _log.info("NPC_EVENT open_teleport")
+        try:
+            if self._player is None:
+                return
+            self._campfire_menu.open(self._player)
+            self._campfire_menu._show_teleport_panel = True
+            self._campfire_menu._load_teleport_targets()
+            self._dialogue_box.close()
+            self._dialogue_paused = False
+            _log.info("NPC_EVENT open_teleport done")
+        except Exception:
+            import traceback
+            _log.error("NPC_EVENT open_teleport FAILED:\n%s", traceback.format_exc())
+            traceback.print_exc()
+
+    def _on_npc_open_weapon_upgrade(self, data: dict) -> None:
+        """铁匠：打开武器强化面板。"""
+        _log.info("NPC_EVENT open_weapon_upgrade player=%s", self._player is not None)
+        try:
+            if self._player is None:
+                return
+            self._campfire_menu.open(self._player)
+            self._campfire_menu._show_weapon_panel = True
+            self._dialogue_box.close()
+            self._dialogue_paused = False
+            _log.info("NPC_EVENT open_weapon_upgrade done")
+        except Exception:
+            import traceback
+            _log.error("NPC_EVENT open_weapon_upgrade FAILED:\n%s", traceback.format_exc())
+            traceback.print_exc()
+
+    def _on_npc_open_shop(self, data: dict) -> None:
+        """商人：打开商店（暂用浮字提示 + 关闭对话）。"""
+        _log.info("NPC_EVENT open_shop player=%s", self._player is not None)
+        try:
+            if self._player is None:
+                return
+            self._floating_texts.add(
+                "商店功能开发中...",
+                self._player.rect.centerx, self._player.rect.top - 20,
+                color=(255, 220, 100), size=16, lifetime=2.0,
+            )
+            self._dialogue_box.close()
+            self._dialogue_paused = False
+            _log.info("NPC_EVENT open_shop done")
+        except Exception:
+            import traceback
+            _log.error("NPC_EVENT open_shop FAILED:\n%s", traceback.format_exc())
+            traceback.print_exc()
+
+    def _on_dialogue_closed(self, data: dict) -> None:
+        """对话框关闭时清除暂停标记（处理无 action 结束对话的场景）。"""
+        self._dialogue_paused = False
+
+    # ----------------------------------------------------------------
     # 抛射物（弓箭 / 魔法弹 / 毒飞镖）每帧更新
     # ----------------------------------------------------------------
 
@@ -432,6 +530,11 @@ class GameScene(BaseScene):
                 if self._campfire_menu.handle_event(event):
                     continue
 
+            # ---- 对话框优先消耗事件（第 10 阶段）----
+            if self._dialogue_box.is_open():
+                if self._dialogue_box.handle_event(event):
+                    continue
+
             # ---- 背包界面优先消耗事件 ----
             if self._inv_screen.is_open:
                 if self._inv_screen.handle_event(event):
@@ -445,34 +548,57 @@ class GameScene(BaseScene):
                 if event.key == pygame.K_ESCAPE:
                     from scenes.pause_scene import PauseScene
                     scene_manager.push(PauseScene())
-                if event.key == pygame.K_f and self._player and not self._campfire_menu.visible:
-                    # 优先检测：是否靠近营地
+                if event.key == pygame.K_f and self._player and not self._campfire_menu.visible and not self._dialogue_box.is_open():
+                    # 优先级 1：营地篝火
                     near_campfire = False
                     for cf in self._area.campfires:
                         if cf.try_activate(self._player.rect,
                                            player=self._player,
                                            area=self._area):
                             near_campfire = True
-                    # 打开营地菜单
                     if near_campfire:
                         self._campfire_menu.open(self._player)
                         self._campfire_paused = True
-                    # 其次检测：是否靠近雾门（按键交互，避免碰撞误触发）
-                    elif not self._boss_triggered:
-                        for br in self._area.boss_rooms:
-                            if br.try_interact(self._player.rect):
-                                self._boss_triggered = True
-                                # 确保复活点
-                                from systems.campfire_system import CampfireSystem
-                                last_cf = CampfireSystem.get_last_campfire()
-                                if last_cf is None and self._area.campfires:
-                                    player_cx = self._player.rect.centerx
-                                    nearest = min(self._area.campfires,
-                                                  key=lambda cf: abs(cf.x - player_cx))
-                                    area_id = getattr(self._area, "area_id", "area_graveyard")
-                                    CampfireSystem.activate(nearest.campfire_id, area_id, nearest.x, nearest.y)
-                                self._enter_boss_room(br)
-                                continue
+                    # 优先级 2：NPC 对话
+                    else:
+                        near_npc = None
+                        for npc in self._area.npcs:
+                            npc.update(0, self._player.rect)
+                            if npc.is_near():
+                                near_npc = npc
+                                break
+                        if near_npc is not None:
+                            # 注入上下文
+                            if hasattr(near_npc, "set_context"):
+                                near_npc.set_context(self._player, self._area)
+                            # 获取动作回调
+                            actions = {}
+                            if hasattr(near_npc, "get_actions"):
+                                actions = near_npc.get_actions()
+                            # 创建对话引擎
+                            dia_data = near_npc.get_dialogue()
+                            if dia_data:
+                                self._dialogue_engine = DialogueEngine(dia_data, actions)
+                                self._dialogue_engine.start()
+                                name = getattr(near_npc, "display_name", "NPC")
+                                self._dialogue_box.open(self._dialogue_engine, name)
+                                self._dialogue_paused = True
+                        # 优先级 3：雾门
+                        elif not self._boss_triggered:
+                            for br in self._area.boss_rooms:
+                                if br.try_interact(self._player.rect):
+                                    self._boss_triggered = True
+                                    # 确保复活点
+                                    from systems.campfire_system import CampfireSystem
+                                    last_cf = CampfireSystem.get_last_campfire()
+                                    if last_cf is None and self._area.campfires:
+                                        player_cx = self._player.rect.centerx
+                                        nearest = min(self._area.campfires,
+                                                      key=lambda cf: abs(cf.x - player_cx))
+                                        area_id = getattr(self._area, "area_id", "area_graveyard")
+                                        CampfireSystem.activate(nearest.campfire_id, area_id, nearest.x, nearest.y)
+                                    self._enter_boss_room(br)
+                                    continue
                 # I 键：背包
                 if event.key == pygame.K_i and self._player:
                     self._inv_screen.toggle(self._player)
@@ -501,11 +627,38 @@ class GameScene(BaseScene):
             self._campfire_menu.update(dt)
             return
 
+        # ---- 对话进行中：暂停游戏逻辑（第 10 阶段）----
+        if self._dialogue_paused:
+            self._dialogue_box.update(dt)
+            return
+
         # ---- 背包/装备界面打开时暂停游戏逻辑 ----
         if self._inv_screen.is_open or self._equip_screen.is_open:
             return
 
         self._player.update(dt, self._area.collision)
+
+        # ---- 第 10 阶段·坠落死亡检测 ----
+        # 地图高度 = tile_size * height, 玩家若掉出世界底部则死亡
+        world_bottom = self._area.world_bounds.bottom + 128  # 额外 128px 缓冲
+        if self._player.rect.top > world_bottom:
+            # 直接杀死玩家（1 点过量伤害触发死亡流程）
+            self._player.stats.take_damage(9999)
+            if self._player.stats.is_dead:
+                self._player.fsm.change_state("Dead")
+            # 创建遗物（在地面边界附近而非实际坠落位置，避免遗物不可达）
+            if self._area is not None:
+                SoulFragmentSystem.create_death_relic(self._player, self._area)
+                # 将遗物移到玩家最后的地面位置附近
+                if self._area.death_relic:
+                    self._area.death_relic.x = self._player.rect.centerx
+                    self._area.death_relic.y = world_bottom - 64
+            lost_souls = self._player.soul_fragments
+            dx = self._player.rect.centerx
+            dy = self._player.rect.centery
+            self._death_screen.show(lost_souls, dx, dy)
+            self._death_paused = True
+            return
 
         # ---- 第 8.1 阶段：玩家死亡检测 → 显示死亡界面 ----
         # 条件：HP <= 0 且不在死亡界面暂停中
@@ -543,16 +696,19 @@ class GameScene(BaseScene):
         self._camera.update(dt, self._player.rect)
         self._hud.update(self._player, dt)
 
-        # ---- 敌人更新 ----
+        # ---- 敌人更新 + 坠落死亡检测（第 10 阶段）----
+        world_bottom = self._area.world_bounds.bottom + 128
         living = []
         for enemy in self._area.enemies:
             enemy.player = self._player
-            # 确保飘字管理器已绑定
             if enemy.status._ftm is None:
                 enemy.status.bind_floating_text_manager(self._floating_texts)
-            # 让敌人也可以攻击玩家的友方召唤物
             enemy.attack_targets = [self._player] + getattr(self._area, "allies", [])
             enemy.update(dt, self._area.collision)
+            # 坠落死亡：直接杀死，由 AI Dead 状态自动触发掉落
+            if not enemy.dead and enemy.rect.top > world_bottom:
+                enemy.stats.take_damage(9999)
+                enemy.fsm.change_state("Dead")
             if not enemy.dead:
                 living.append(enemy)
         self._area.enemies = living
@@ -654,13 +810,17 @@ class GameScene(BaseScene):
         if self._campfire_menu.visible:
             self._campfire_menu.render(surface)
 
+        # 14. 对话框（最高覆盖层，第 10 阶段）
+        if self._dialogue_box.is_open():
+            self._dialogue_box.render(surface)
+
         pygame.display.flip()
 
     def _render_hints(self, surface: pygame.Surface):
         hints = [
             "A/D: 移动    Space: 跳跃    S+Space: 下穿平台",
             "Shift: 翻滚    J: 轻攻击    K: 重攻击    L: 格挡/弹反    U: 战技",
-            "F: 篝火    I: 背包    C: 装备    T: 受击测试    F3: 调试    ESC: 暂停",
+            "F: 篝火/NPC    I: 背包    C: 装备    T: 受击测试    F3: 调试    ESC: 暂停",
         ]
         font = self._hint_font
         # 右上角，从上往下排，留 12px 右边距和顶边距

@@ -45,6 +45,8 @@ class Area:
         self.enemies:     List["BaseEnemy"] = []
         # 玩家召唤的友方单位（阵营 player，AI 攻击敌人）
         self.allies:      List["BaseEnemy"] = []
+        # 第 10 阶段·NPC 系统：NPC 列表
+        self.npcs:        List = []
         # 第 5 阶段·武器系统：抛射物列表（弓箭 / 魔法弹）
         # GameScene 每帧需调用 update() 推进；命中检测由 HitResolver 处理
         self.projectiles: List = []
@@ -103,6 +105,9 @@ class Area:
         # 加载 Boss 房间（雾门）
         self._load_boss_rooms()
 
+        # 第 10 阶段·NPC 系统：加载 NPC
+        self._load_npcs()
+
         self._loaded = True
 
     def reload(self):
@@ -134,6 +139,9 @@ class Area:
         # 重载敌人（全部重新生成）
         self._load_enemies()
 
+        # 重载 NPC
+        self._load_npcs()
+
     def _load_enemies(self):
         """
         加载敌人实例。
@@ -155,18 +163,37 @@ class Area:
         # 古墓地带 Boss：腐骨公爵
         if self.area_id == "area_graveyard":
             ts = self.tile_map.tile_size
-            # 雾门放在 cf_03 营地(col 92)和传送门(col 96)之间，col 95
-            gate_x = 95 * ts + ts // 2
-            gate_y = 17 * ts - ts // 2   # row 17 地面位置
+            # 雾门放在 cf_03 营地(col 131)和传送门(col 142)之间
+            gate_x = 139 * ts + ts // 2
+            gate_y = 17 * ts - ts // 2
             room = BossRoom(
                 room_id="boss_duke",
                 world_x=gate_x, world_y=gate_y,
                 boss_id="duke_rotbone",
                 boss_class=DukeRotbone,
-                spawn_x=96 * ts + ts // 2,  # Boss 出生在传送门位置
+                spawn_x=142 * ts + ts // 2,
                 spawn_y=17 * ts - 64,
             )
             self.boss_rooms.append(room)
+
+    def _load_npcs(self):
+        """第 10 阶段：从 tilemap JSON objects.npcs 加载 NPC。"""
+        self.npcs.clear()
+
+        npc_data = self.tile_map.objects.get("npcs", [])
+        if not npc_data:
+            return
+
+        from entities.npc.base_npc import create_npc
+
+        ts = self.tile_map.tile_size
+        for nd in npc_data:
+            wx = nd.get("x", 0) * ts + ts // 2
+            wy = nd.get("y", 0) * ts
+            npc_type = nd.get("type", "keeper")
+            npc_id = nd.get("id", f"npc_{len(self.npcs)}")
+            npc = create_npc(npc_type, npc_id, wx, wy)
+            self.npcs.append(npc)
 
     # ---- 更新 ----
 
@@ -177,6 +204,9 @@ class Area:
             trap.update(dt)
         for br in self.boss_rooms:
             br.update(dt, player_rect)
+        # NPC（第 10 阶段）
+        for npc in self.npcs:
+            npc.update(dt, player_rect)
 
     # ---- 渲染 ----
 
@@ -197,6 +227,9 @@ class Area:
         # 雾门（第 9 阶段）
         for br in self.boss_rooms:
             br.render(surface, cam_offset)
+        # NPC（第 10 阶段）
+        for npc in self.npcs:
+            npc.render(surface, cam_offset)
 
     def render_foreground(self, renderer, camera):
         if self.layer_renderer:

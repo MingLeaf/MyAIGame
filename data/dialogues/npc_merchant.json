@@ -1,0 +1,30 @@
+{
+  "start_node": "greeting",
+  "nodes": {
+    "greeting": {
+      "speaker": "商人 莉亚",
+      "text": "欢迎！我是莉亚，行走在烬土的旅行商人。要不要看看我的货？虽然在这墓地旁摆摊有点瘆人就是了。",
+      "choices": [
+        {"text": "看看有什么卖的", "action": "open_shop", "next": "after_shop"},
+        {"text": "你怎么敢在墓地做生意？", "action": "chat", "next": "lore_merchant"},
+        {"text": "不了，我赶路", "action": null, "next": null}
+      ]
+    },
+    "after_shop": {
+      "speaker": "商人 莉亚",
+      "text": "货真价实，童叟无欺！下次到了毒沼泽，我还会有新货。记得多攒些灵魂碎片。",
+      "choices": [
+        {"text": "再见", "action": null, "next": null},
+        {"text": "毒沼泽危险吗？", "action": "chat", "next": "lore_merchant"}
+      ]
+    },
+    "lore_merchant": {
+      "speaker": "商人 莉亚",
+      "text": "有我这种不怕死的商人，才有你们这些不怕死的冒险者呀。而且……篝火旁边是最安全的，那个守护者老头会罩着我。",
+      "choices": [
+        {"text": "有道理", "action": null, "next": null},
+        {"text": "看看商品", "action": "open_shop", "next": "after_shop"}
+      ]
+    }
+  }
+}
