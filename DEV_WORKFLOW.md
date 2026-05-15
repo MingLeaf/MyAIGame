@@ -892,55 +892,68 @@ data/
 7. **Area 集成**：自动从 tilemap JSON 加载 NPC
 8. **冒烟测试** `_test_stage10_npc.py` 10 项全部通过
 
-### 1.3.18 地图 v4.1 修复（深坑 + 铁匠浮空 + 闪退）
+### 1.3.18 第 10 阶段后续修复汇总
 
-1. **深坑修复**：所有 row 17 深坑从最大 10 格缩小至 ≤4 格，确保玩家可安全跳跃
-2. **铁匠 NPC 位置**：从深坑上的 col 67 → 实心地面 col 61
-3. **平台敌人修正**：archer col 48 row 13（浮空）→ col 27 row 13（站在 row 14 平台）
-4. **闪退修复**：`DialogueBox.handle_event` 中 `select_choice` 回调同步关闭对话后增加 `engine is None` 检查，防止 `AttributeError`
-
-### 1.3.19 地图 v4.2 + 坠落死亡 + 对话安全增强
-
-1. **铁匠位置**：col 61 → col 69（营地 cf_02 col70 左侧悬崖边，营地最近侧）
-2. **商人闪退防护**：`DialogueBox.render/update` 增加 `self._engine is None` 守卫
-3. **坠落死亡**：玩家 y > `world_bounds.bottom + 128px` 时触发即死
-4. **对话结束后暂停修复**：`DialogueBox.close()` 发布 `dialogue_closed` 事件，`GameScene` 订阅后清除 `_dialogue_paused`
-5. **异常容错**：4 个 NPC 事件处理器 + `DialogueEngine.select_choice` 加 try-except+traceback
-
-### 1.3.20 调试模式默认关闭 + 对话日志
-
-1. **调试模式**：`config.DEBUG_MODE = False`，按 F3 手动开启
-2. **对话日志**：`dialogue_box.py` / `dialogue_engine.py` / `game_scene.py` 十处关键路径加 `logging.getLogger("dialogue")` 日志
-3. **调试启动器**：`__debug_dialogue.py` 将日志写入 `__dialogue_log.txt`
+| 修复项 | 说明 |
+|--------|------|
+| 深坑安全 | row 17 深坑 ≤4 格，玩家可安全跳跃 |
+| 铁匠位置 | col 67(坑)→col 61→col 69（营地悬崖边） |
+| 商人位置 | col 129（cf_03 左侧 2 格） |
+| set_context 闪退 | BlacksmithNPC/MerchantNPC 统一签名 `(player, area=None)` |
+| 无 action 结束暂停 | `DialogueBox.close()` 发布 `dialogue_closed` 事件解除 `_dialogue_paused` |
+| 异常容错 | 4 个 NPC 事件处理器 + `DialogueEngine` 全部加 try-except+traceback |
+| 坠落死亡（玩家） | y > world_bottom + 128 → 9999 伤害 → 死亡流程 |
+| 坠落死亡（敌人） | 同逻辑 + AI Dead 状态自动触发掉落 |
+| 法师 AI 改进 | 吟唱中不被打断，边后撤边施法，未吟唱时后撤速度 1.2x |
+| 传送功能 | CampfireMenu 新增传送子面板，守护者对话触发，自动休息后 `scene_manager.replace` |
+| 面板适配 | 主面板 320→380，容纳 5 项菜单（升级/强化/传送/休息/离开） |
+| 调试默认 | `config.DEBUG_MODE=False`，F3 手动开启 |
+| 对话日志 | 10 处关键路径 logger，`__debug_dialogue.py` 写入 `__dialogue_log.txt` |
 
 ---
 
 ## 五、提示词使用示范
 
-打开新窗口后的标准开场（以"窗口 1 · 武器系统"为例）：
+打开新窗口后的标准开场（以第 11 阶段为例）：
 
 ```
-我正在按 game_rule.md 中的开发顺序推进《烬土传说》——一个 2.5D 横版类魂 RPG，技术栈 Python + Pygame。
+我正在按 game_rule.md 开发《烬土传说》——2.5D 横版类魂 RPG（Python + Pygame）。
 
 工程根目录：d:\Project\MyAIGame
-开发文档：d:\Project\MyAIGame\game_rule.md
-工作流总览：d:\Project\MyAIGame\DEV_WORKFLOW.md（请先阅读 §1 了解当前进度与设计约定）
+游戏设计案：game_rule.md
+开发工作流：DEV_WORKFLOW.md（请先阅读 §1 了解当前进度与设计约定）
 
-【已完成】第 1~4 阶段
-[...粘贴 §2 通用上下文模板剩余部分...]
+【已完成】第 1~10 阶段（工程基础 → NPC 对话系统，全部完成）
 
-【本次任务】
-[...粘贴对应窗口"本次任务"全部内容...]
+【本次任务】第 11 阶段：粒子特效与音频
 
-请按以下流程工作：
-1. 先用 list_files_recursive 看 weapons/ 现状
-2. 阅读现有 base_weapon.py / sword.py 理解模板
-3. 制定增量实现计划，征求我同意后开工
-4. 完成后写冒烟测试 _test_stage5_weapons.py 并运行验证
-5. 在 DEV_WORKFLOW.md §1.1 中将第 5 阶段标记为 ✅
+让战斗有视觉/听觉反馈，区域有专属 BGM。
+
+需要新建：
+1. animation/__init__.py
+2. animation/animation_clip.py —— 动画片段
+3. animation/sprite_sheet_loader.py —— 精灵表切割
+4. animation/animation_state_machine.py —— 动画状态机
+5. animation/animator.py —— 动画控制器
+6. animation/particle_system.py —— 粒子系统（血溅/火焰/魔法光效/灰尘/弹反闪光）
+7. audio/__init__.py
+8. audio/sfx_player.py —— 音效播放器（订阅事件）
+9. audio/bgm_player.py —— BGM 播放器（淡入淡出/区域切换）
+10. audio/audio_manager.py —— 音频统一入口
+
+接入要求：
+- 命中事件 → 血溅粒子 + 打击音
+- 弹反成功 → 金色闪光 + 金属碰撞
+- 状态异常（毒/烧/冰/流血）→ 对应粒子
+- 新区域 → BGM 淡入淡出
+- 暂用程序生成占位粒子/音效，后续替换资源
+
+请先：
+1. 阅读 DEV_WORKFLOW.md §1 和 game_rule.md
+2. 用 list_files_recursive 查看现有 animation/ audio/ assets/ 目录
+3. 了解现有事件系统（core/event_manager.py）的可用事件名
+4. 制定增量实现计划，征求我同意后开工
 ```
-
-> 把这套模板放在你的剪贴板管理器里，每次开新窗口三秒钟即可启动。
 
 
 

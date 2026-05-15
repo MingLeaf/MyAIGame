@@ -56,6 +56,8 @@ class Area:
         self.dropped_items: List = []
         # 第 8 阶段·灵魂碎片系统：死亡遗物（每次只有一个）
         self.death_relic = None
+        # 第 11 阶段·音频系统：区域 BGM ID（默认同 area_id，可通过 tilemap JSON 覆盖）
+        self.bgm_id: str = area_id
 
         self._loaded = False
 

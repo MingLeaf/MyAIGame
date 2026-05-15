@@ -73,6 +73,13 @@ class StatusManager:
         effect.apply(self._owner)
         self._push_text(f"[{name}]", _STATUS_COLOR.get(name, (220, 220, 80)))
 
+        # 第 11 阶段：发射状态添加事件，供粒子系统订阅
+        from core.event_manager import event_manager
+        event_manager.emit("status_applied", {
+            "entity": self._owner,
+            "status": name,
+        })
+
     def reset_bleed_stack(self) -> None:
         """将流血积累值清零（用于净化/特定道具）。"""
         bleed = self._effects.get("bleed")
@@ -89,6 +96,12 @@ class StatusManager:
         if name in self._effects:
             self._effects[name].remove(self._owner)
             del self._effects[name]
+            # 第 11 阶段：发射状态移除事件，供粒子系统清理
+            from core.event_manager import event_manager
+            event_manager.emit("status_removed", {
+                "entity": self._owner,
+                "status": name,
+            })
 
     def clear(self) -> None:
         """移除所有状态"""

@@ -34,6 +34,9 @@ from systems.soul_fragment_system import SoulFragmentSystem
 from systems.respawn_system       import RespawnSystem
 from systems.campfire_system      import CampfireSystem
 from systems.quest_system         import QuestSystem
+# 第 11 阶段：粒子特效与音频
+from animation.particle_system import ParticleManager
+from audio.audio_manager import AudioManager
 
 
 class GameScene(BaseScene):
@@ -74,6 +77,10 @@ class GameScene(BaseScene):
 
         # ---- Boss 触发标记 ----
         self._boss_triggered: bool = False
+
+        # ---- 第 11 阶段·粒子特效与音频 ----
+        self._particle_mgr = ParticleManager()
+        self._audio_mgr = AudioManager()
 
         # ---- 第 10 阶段·NPC 与对话系统 ----
         self._dialogue_box = DialogueBox()
@@ -133,6 +140,21 @@ class GameScene(BaseScene):
         event_manager.subscribe("npc_open_shop",           self._on_npc_open_shop)
         event_manager.subscribe("dialogue_closed",          self._on_dialogue_closed)
 
+        # ---- 第 11 阶段：音频系统初始化 ----
+        self._audio_mgr.initialize()
+        # 播放区域 BGM
+        bgm_id = getattr(self._area, "bgm_id", self._area_id)
+        self._audio_mgr.play_bgm(bgm_id)
+
+        # ---- 第 11 阶段：粒子特效事件订阅 ----
+        event_manager.subscribe("player_hurt",     self._on_particle_hurt)
+        event_manager.subscribe("player_block_hit", self._on_particle_block)
+        event_manager.subscribe("player_parry",    self._on_particle_parry)
+        event_manager.subscribe("player_dodge",    self._on_particle_dodge)
+        event_manager.subscribe("status_applied",  self._on_particle_status)
+        event_manager.subscribe("weapon_art_used", self._on_particle_weapon_art)
+        event_manager.subscribe("status_removed",  self._on_particle_status_removed)
+
         self._loaded = True
 
     def on_exit(self):
@@ -153,6 +175,17 @@ class GameScene(BaseScene):
         event_manager.unsubscribe("npc_open_weapon_upgrade", self._on_npc_open_weapon_upgrade)
         event_manager.unsubscribe("npc_open_shop",           self._on_npc_open_shop)
         event_manager.unsubscribe("dialogue_closed",         self._on_dialogue_closed)
+
+        # ---- 第 11 阶段：清理粒子 + 音频 ----
+        event_manager.unsubscribe("player_hurt",     self._on_particle_hurt)
+        event_manager.unsubscribe("player_block_hit", self._on_particle_block)
+        event_manager.unsubscribe("player_parry",    self._on_particle_parry)
+        event_manager.unsubscribe("player_dodge",    self._on_particle_dodge)
+        event_manager.unsubscribe("status_applied",  self._on_particle_status)
+        event_manager.unsubscribe("weapon_art_used", self._on_particle_weapon_art)
+        event_manager.unsubscribe("status_removed",  self._on_particle_status_removed)
+        self._particle_mgr.clear()
+        self._audio_mgr.stop_bgm(fade_ms=800)
 
     def on_resume(self):
         """从 BossScene pop 后恢复：重置雾门触发标记，允许再次进入。"""
@@ -737,6 +770,9 @@ class GameScene(BaseScene):
 
         self._floating_texts.update(dt)
 
+        # ---- 第 11 阶段：粒子特效更新 ----
+        self._particle_mgr.update(dt)
+
         if debug.enabled:
             p = self._player
             g = p.growth
@@ -782,6 +818,10 @@ class GameScene(BaseScene):
         # 5. 玩家
         if self._player:
             self._player.render(surface, cam_offset)
+
+        # 5.5. 粒子特效（第 11 阶段：世界空间粒子 + 屏幕空间粒子）
+        cx, cy = cam_offset
+        self._particle_mgr.render(surface, cx, cy)
 
         # 6. 前景遮挡层
         self._area.render_foreground(renderer, self._camera)
@@ -830,6 +870,92 @@ class GameScene(BaseScene):
             x = SCREEN_WIDTH - surf.get_width() - 12
             surface.blit(surf, (x, top))
             top += surf.get_height() + 4
+
+    # ----------------------------------------------------------------
+    # 第 11 阶段：粒子特效事件处理
+    # ----------------------------------------------------------------
+
+    def _on_particle_hurt(self, data: dict) -> None:
+        """玩家受击 → 血溅粒子。"""
+        if self._player is None:
+            return
+        cx = self._player.rect.centerx
+        cy = self._player.rect.centery
+        self._particle_mgr.spawn("blood_splash", position=(cx, cy))
+
+    def _on_particle_block(self, data: dict) -> None:
+        """玩家格挡 → 盾击尘烟。"""
+        if self._player is None:
+            return
+        cx = self._player.rect.centerx
+        cy = self._player.rect.centery
+        self._particle_mgr.spawn("dust", position=(cx, cy))
+
+    def _on_particle_parry(self, data: dict) -> None:
+        """弹反成功 → 金色闪光（屏幕空间） + 敌人位置血溅。"""
+        if self._player is None:
+            return
+        # 屏幕空间金色闪光
+        px = SCREEN_WIDTH // 2
+        py = SCREEN_HEIGHT // 2
+        self._particle_mgr.spawn("parry_flash", screen_pos=(px, py))
+
+        # 攻击者位置的血溅
+        attacker = data.get("attacker")
+        if attacker is not None and hasattr(attacker, "rect") and attacker.rect is not None:
+            ax = attacker.rect.centerx
+            ay = attacker.rect.centery
+            self._particle_mgr.spawn("blood_splash", position=(ax, ay))
+
+    def _on_particle_dodge(self, data: dict) -> None:
+        """玩家翻滚 → 灰尘粒子。"""
+        if self._player is None:
+            return
+        cx = self._player.rect.centerx
+        cy = self._player.rect.bottom
+        self._particle_mgr.spawn("dust", position=(cx, cy))
+
+    def _on_particle_status(self, data: dict) -> None:
+        """状态异常 apply → 挂载对应粒子发射器到实体。"""
+        entity = data.get("entity")
+        status_name = data.get("status", "")
+        if entity is None:
+            return
+
+        # 状态→粒子预设映射
+        status_particle_map = {
+            "poison": "poison",
+            "burn":   "burn",
+            "freeze": "freeze",
+            "bleed":  "bleed",
+        }
+        preset = status_particle_map.get(status_name)
+        if preset:
+            self._particle_mgr.attach(preset, entity)
+
+    def _on_particle_weapon_art(self, data: dict) -> None:
+        """战技释放 → 魔法光效。"""
+        player = data.get("player")
+        if player is None:
+            return
+        cx = getattr(player, "rect", None)
+        if cx is not None:
+            self._particle_mgr.spawn("magic",
+                                     position=(cx.centerx, cx.centery))
+
+    def _on_particle_status_removed(self, data: dict) -> None:
+        """状态异常移除 → 清理对应粒子发射器。"""
+        entity = data.get("entity")
+        status_name = data.get("status", "")
+        if entity is None:
+            return
+        status_particle_map = {
+            "poison": "poison", "burn": "burn",
+            "freeze": "freeze", "bleed": "bleed",
+        }
+        preset = status_particle_map.get(status_name)
+        if preset:
+            self._particle_mgr.remove_attached(preset, entity)
 
     # ----------------------------------------------------------------
     # Boss 房间入口（第 9 阶段）

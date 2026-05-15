@@ -32,6 +32,9 @@ from combat.floating_text import FloatingTextManager
 from combat.hit_resolver import HitResolver
 from map.area import Area
 from items.item_manager import ItemManager
+# 第 11 阶段：粒子特效与音频
+from animation.particle_system import ParticleManager
+from audio.audio_manager import AudioManager
 
 if TYPE_CHECKING:
     from entities.enemy.bosses.base_boss import BaseBoss
@@ -97,6 +100,10 @@ class BossScene(BaseScene):
         self._boss_dead: bool = False
         self._finish_timer: float = 0.0
 
+        # ---- 第 11 阶段·粒子特效与音频 ----
+        self._particle_mgr = ParticleManager()
+        self._audio_mgr = AudioManager()
+
         # 将玩家 + Boss 放入 Boss 地图
         spawn = self._area.get_spawn_point()
         self._player.set_position(spawn[0], spawn[1])
@@ -129,6 +136,20 @@ class BossScene(BaseScene):
         event_manager.subscribe("enemy_dead", self._on_enemy_dead)
         event_manager.subscribe("player_buff_applied", self._on_player_buff)
 
+        # ---- 第 11 阶段：音频系统 ----
+        self._audio_mgr.initialize()
+        bgm_id = getattr(self._area, "bgm_id", self._area.area_id)
+        self._audio_mgr.play_bgm(bgm_id)
+
+        # ---- 第 11 阶段：粒子事件 ----
+        event_manager.subscribe("player_hurt",     self._on_particle_hurt)
+        event_manager.subscribe("player_block_hit", self._on_particle_block)
+        event_manager.subscribe("player_parry",    self._on_particle_parry)
+        event_manager.subscribe("player_dodge",    self._on_particle_dodge)
+        event_manager.subscribe("status_applied",  self._on_particle_status)
+        event_manager.subscribe("weapon_art_used", self._on_particle_weapon_art)
+        event_manager.subscribe("status_removed",  self._on_particle_status_removed)
+
     def on_exit(self) -> None:
         self._health_bar.detach()
         event_manager.unsubscribe("boss_killed", self._on_boss_killed)
@@ -138,6 +159,16 @@ class BossScene(BaseScene):
         event_manager.unsubscribe("summon_ally", self._on_summon_ally)
         event_manager.unsubscribe("enemy_dead", self._on_enemy_dead)
         event_manager.unsubscribe("player_buff_applied", self._on_player_buff)
+        # 第 11 阶段：清理粒子 + 音频
+        event_manager.unsubscribe("player_hurt",     self._on_particle_hurt)
+        event_manager.unsubscribe("player_block_hit", self._on_particle_block)
+        event_manager.unsubscribe("player_parry",    self._on_particle_parry)
+        event_manager.unsubscribe("player_dodge",    self._on_particle_dodge)
+        event_manager.unsubscribe("status_applied",  self._on_particle_status)
+        event_manager.unsubscribe("weapon_art_used", self._on_particle_weapon_art)
+        event_manager.unsubscribe("status_removed",  self._on_particle_status_removed)
+        self._particle_mgr.clear()
+        self._audio_mgr.stop_bgm(fade_ms=800)
 
     def update(self, dt: float) -> None:
         if self._finished:
@@ -228,6 +259,9 @@ class BossScene(BaseScene):
         self._floating_texts.update(dt)
         self._camera.update(dt, self._player.rect)
         self._hud.update(self._player, dt)
+
+        # ---- 第 11 阶段：粒子特效更新 ----
+        self._particle_mgr.update(dt)
 
     def _update_projectiles(self, dt: float) -> None:
         """更新 Boss 房间内的所有抛射物（毒飞镖/弓箭/魔法弹等）。"""
@@ -343,6 +377,10 @@ class BossScene(BaseScene):
         if self._player and not self._death_paused:
             self._player.render(surface, cam_offset)
 
+        # ---- 第 11 阶段：粒子特效 ----
+        cx, cy = cam_offset
+        self._particle_mgr.render(surface, cx, cy)
+
         # 前景
         self._area.render_foreground(renderer, self._camera)
 
@@ -454,6 +492,80 @@ class BossScene(BaseScene):
             self._player.rect.centerx, self._player.rect.top - 30,
             color=(255, 200, 80), size=14, lifetime=2.0,
         )
+
+    # ----------------------------------------------------------------
+    # 第 11 阶段：粒子特效事件处理
+    # ----------------------------------------------------------------
+
+    def _on_particle_hurt(self, data: dict) -> None:
+        if self._player is None:
+            return
+        cx = self._player.rect.centerx
+        cy = self._player.rect.centery
+        self._particle_mgr.spawn("blood_splash", position=(cx, cy))
+
+    def _on_particle_block(self, data: dict) -> None:
+        if self._player is None:
+            return
+        cx = self._player.rect.centerx
+        cy = self._player.rect.centery
+        self._particle_mgr.spawn("dust", position=(cx, cy))
+
+    def _on_particle_parry(self, data: dict) -> None:
+        if self._player is None:
+            return
+        from config import SCREEN_WIDTH, SCREEN_HEIGHT
+        self._particle_mgr.spawn("parry_flash",
+                                 screen_pos=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2))
+        attacker = data.get("attacker")
+        if attacker is not None and hasattr(attacker, "rect") and attacker.rect is not None:
+            ax = attacker.rect.centerx
+            ay = attacker.rect.centery
+            self._particle_mgr.spawn("blood_splash", position=(ax, ay))
+
+    def _on_particle_dodge(self, data: dict) -> None:
+        if self._player is None:
+            return
+        cx = self._player.rect.centerx
+        cy = self._player.rect.bottom
+        self._particle_mgr.spawn("dust", position=(cx, cy))
+
+    def _on_particle_status(self, data: dict) -> None:
+        entity = data.get("entity")
+        status_name = data.get("status", "")
+        if entity is None:
+            return
+        status_particle_map = {
+            "poison": "poison",
+            "burn":   "burn",
+            "freeze": "freeze",
+            "bleed":  "bleed",
+        }
+        preset = status_particle_map.get(status_name)
+        if preset:
+            self._particle_mgr.attach(preset, entity)
+
+    def _on_particle_weapon_art(self, data: dict) -> None:
+        player = data.get("player")
+        if player is None:
+            return
+        cx = getattr(player, "rect", None)
+        if cx is not None:
+            self._particle_mgr.spawn("magic",
+                                     position=(cx.centerx, cx.centery))
+
+    def _on_particle_status_removed(self, data: dict) -> None:
+        entity = data.get("entity")
+        status_name = data.get("status", "")
+        if entity is None:
+            return
+        status_particle_map = {
+            "poison": "poison", "burn": "burn",
+            "freeze": "freeze", "bleed": "bleed",
+        }
+        preset = status_particle_map.get(status_name)
+        if preset:
+            self._particle_mgr.remove_attached(preset, entity)
 
     def _finish_boss(self) -> None:
         self._finished = True
