@@ -61,9 +61,12 @@ class HitResolver:
         """
         扫描 player.active_hitboxes，逐一与 enemy_list 检测碰撞。
         命中则计算伤害、施加伤害、生成飘字、发布音效事件。
+        跳过与攻击者同阵营的目标（避免友军伤害）。
         """
         if not player or not getattr(player, "active_hitboxes", None):
             return
+
+        attacker_team = getattr(player, "team", "player")
 
         for hb in player.active_hitboxes:
             if not hb.active:
@@ -71,6 +74,9 @@ class HitResolver:
 
             for enemy in enemy_list:
                 if enemy.is_dead:
+                    continue
+                # 跳过同阵营目标
+                if getattr(enemy, "team", "enemy") == attacker_team:
                     continue
 
                 eid = id(enemy)

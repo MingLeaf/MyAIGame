@@ -43,6 +43,8 @@ class Area:
         self.transitions: List[TransitionGate] = []
         self.boss_rooms:  List["BossRoom"] = []
         self.enemies:     List["BaseEnemy"] = []
+        # 玩家召唤的友方单位（阵营 player，AI 攻击敌人）
+        self.allies:      List["BaseEnemy"] = []
         # 第 5 阶段·武器系统：抛射物列表（弓箭 / 魔法弹）
         # GameScene 每帧需调用 update() 推进；命中检测由 HitResolver 处理
         self.projectiles: List = []

@@ -81,7 +81,8 @@ class EnemyIdleState(State):
         e = self.machine.owner
 
         # 视野内即进入 Alert（不再直接 Chase，体现警戒过渡）
-        if e.player and e._can_see_player():
+        target = e._get_ai_target()
+        if target and e._distance_to_target(target) <= e.stats.sight_range:
             self.machine.change_state("Alert")
             return
 
@@ -134,9 +135,10 @@ class EnemyAlertState(State):
         e = self.machine.owner
         e.vel_x = 0.0
         self._turn_timer = ALERT_TURN_TIME
-        # 朝向玩家
-        if e.player:
-            e.facing = 1 if e.player.x > e.x else -1
+        # 朝向目标
+        target = e._get_ai_target()
+        if target:
+            e.facing = 1 if target.x > e.x else -1
         # 派事件给特效层（可加感叹号 "！" 提示符）
         event_manager.emit("enemy_alerted", {"enemy": e})
 
@@ -147,10 +149,10 @@ class EnemyAlertState(State):
             self._turn_timer -= dt
             e.vel_x = 0.0
 
-        # 玩家在视野内 → 累积警觉值
-        if e.player and e._can_see_player():
-            if e.player:
-                e.facing = 1 if e.player.x > e.x else -1
+        target = e._get_ai_target()
+        # 目标在视野内 → 累积警觉值
+        if target and e._distance_to_target(target) <= e.stats.sight_range:
+            e.facing = 1 if target.x > e.x else -1
             e.alert_value = min(1.0, e.alert_value + e.stats.alert_speed * dt)
 
             # 警觉值满 → 转 Chase
@@ -183,12 +185,18 @@ class EnemyChaseState(State):
     def update(self, dt: float):
         e = self.machine.owner
 
-        # 玩家死亡或脱离追击半径 → Return
-        if not e.player or e.player.is_dead or not e._in_chase_range():
+        target = e._get_ai_target()
+        # 目标死亡或超出追击范围 → Return
+        if not target or getattr(target, "is_dead", False):
             self.machine.change_state("Return")
             return
 
-        dx   = e.player.x - e.x
+        dist_to_target = e._distance_to_target(target)
+        if dist_to_target > e.stats.lose_range:
+            self.machine.change_state("Return")
+            return
+
+        dx   = target.x - e.x
         dist = abs(dx)
 
         # 弓箭手 / 法师子类可重写 try_ranged_attack 提前发动远程
@@ -238,21 +246,22 @@ class EnemyAttackState(State):
         e = self.machine.owner
         self._frame += 1
 
+        target = e._get_ai_target()
         # 判定窗口
         if ATK_WINDUP_F <= self._frame < ATK_WINDUP_F + ATK_ACTIVE_F:
-            if not self._hit_done and e.player:
+            if not self._hit_done and target:
                 atk_rect = e._get_attack_rect()
-                if atk_rect.colliderect(e.player.rect):
-                    knockback_dir = 1 if e.player.x > e.x else -1
+                if atk_rect.colliderect(target.rect):
+                    knockback_dir = 1 if target.x > e.x else -1
                     try:
-                        e.player.take_damage(e.stats.atk, knockback_dir,
-                                             attacker=e)
+                        target.take_damage(e.stats.atk, knockback_dir,
+                                           attacker=e)
                     except TypeError:
-                        e.player.take_damage(e.stats.atk, knockback_dir)
+                        target.take_damage(e.stats.atk, knockback_dir)
                     self._hit_done = True
 
         if self._frame >= self._TOTAL_FRAMES:
-            if e.player and e._can_see_player():
+            if target and e._distance_to_target(target) <= e.stats.sight_range:
                 self.machine.change_state("Chase")
             else:
                 self.machine.change_state("Alert")
@@ -280,8 +289,9 @@ class EnemyReturnState(State):
     def update(self, dt: float):
         e = self.machine.owner
 
-        # 中途又发现玩家
-        if e.player and e._can_see_player():
+        # 中途又发现目标
+        target = e._get_ai_target()
+        if target and e._distance_to_target(target) <= e.stats.sight_range:
             self.machine.change_state("Alert")
             return
 
@@ -330,7 +340,8 @@ class EnemyHurtState(State):
         self._timer -= dt
         if self._timer <= 0:
             e = self.machine.owner
-            if e.player and e._can_see_player():
+            target = e._get_ai_target()
+            if target and e._distance_to_target(target) <= e.stats.sight_range:
                 # 受击后直接进入 Chase（已确认目标）
                 self.machine.change_state("Chase")
             else:

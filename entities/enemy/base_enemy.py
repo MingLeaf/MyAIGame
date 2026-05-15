@@ -86,6 +86,9 @@ class BaseEnemy(BaseEntity):
 
         self.player: Optional["Player"] = None
 
+        # 友方召唤物攻击目标列表（为空时走默认 player 逻辑）
+        self.attack_targets: list = []
+
         # 击退组件（替换原来的 _knockback_vx 字段）
         self.kb: KnockbackComponent = KnockbackComponent()
         # 兼容字段：旧代码可能仍读 _knockback_vx
@@ -155,6 +158,44 @@ class BaseEnemy(BaseEntity):
         if self.player is None or self.player.is_dead:
             return False
         return self._distance_to_player() <= self.stats.lose_range
+
+    # ---- 友军 AI 辅助 ----
+
+    def _distance_to_target(self, target) -> float:
+        """计算与目标实体的距离。"""
+        if target is None:
+            return float("inf")
+        import math
+        return math.sqrt((self.x - target.x) ** 2 + (self.y - target.y) ** 2)
+
+    def _get_nearest_attack_target(self):
+        """从 attack_targets 中找最近的活目标。无则返回 None。"""
+        if not self.attack_targets:
+            return None
+        best = None
+        best_dist = float("inf")
+        for t in self.attack_targets:
+            if getattr(t, "dead", False) or getattr(t, "is_dead", False):
+                continue
+            if not getattr(t, "active", True):
+                continue
+            dx = self.x - t.x
+            dy = self.y - t.y
+            dist = dx * dx + dy * dy
+            if dist < best_dist:
+                best_dist = dist
+                best = t
+        return best
+
+    def _get_ai_target(self):
+        """返回 AI 应追踪的目标实体（优先 attack_targets，其次 player）。"""
+        if self.attack_targets:
+            t = self._get_nearest_attack_target()
+            if t is not None:
+                return t
+        if self.player and not self.player.is_dead:
+            return self.player
+        return None
 
     # ----------------------------------------------------------------
     # 受击接口
@@ -351,14 +392,18 @@ class BaseEnemy(BaseEntity):
     def _render_hp_bar(self, surface: pygame.Surface, screen_rect: pygame.Rect):
         ratio = self.stats.hp_ratio
         bx    = screen_rect.centerx - BAR_W // 2
-        # 血条在实体顶部上方 BAR_OY 像素处（向上）
         by    = screen_rect.top - BAR_OY - BAR_H
         pygame.draw.rect(surface, (60, 60, 60), (bx, by, BAR_W, BAR_H))
         filled = int(BAR_W * ratio)
         if filled > 0:
-            r = int(255 * (1.0 - ratio))
-            g = int(255 * ratio)
-            pygame.draw.rect(surface, (r, g, 0), (bx, by, filled, BAR_H))
+            if getattr(self, "team", "enemy") == "player":
+                # 友方：绿色（满血亮绿 → 残血暗绿）
+                g = int(180 * ratio + 50)
+                pygame.draw.rect(surface, (20, g, 30), (bx, by, filled, BAR_H))
+            else:
+                # 敌方：红色（满血深红 → 残血亮红）
+                r = int(160 + 95 * (1.0 - ratio))
+                pygame.draw.rect(surface, (r, 30, 20), (bx, by, filled, BAR_H))
 
     def _render_poise_bar(self, surface: pygame.Surface, screen_rect: pygame.Rect):
         """在血条正下方绘制灰白色韧性条。"""

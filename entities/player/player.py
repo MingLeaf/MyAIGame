@@ -61,6 +61,7 @@ class Player(BaseEntity):
 
     def __init__(self, x: float, y: float):
         super().__init__(x, y, PLAYER_W, PLAYER_H)
+        self.team = "player"  # 玩家阵营
 
         # 子系统
         self.stats    = PlayerStats()

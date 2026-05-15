@@ -112,8 +112,9 @@ class BossScene(BaseScene):
         ground_y = 17 * tile_size  # row 17 地面表面
         boss_spawn_x = self._area.tile_map.world_width // 2
         self._boss.x = float(boss_spawn_x)
-        self._boss.y = float(ground_y)  # y = rect.bottom（因为 rect.y = y - h, rect.bottom = y）
+        self._boss.y = float(ground_y)
         self._boss.player = self._player
+        self._boss._current_area = self._area   # Boss 需要 area 引用统计小兵
 
         # 将 Boss 添加到地图敌人列表
         self._area.enemies.append(self._boss)
@@ -124,6 +125,9 @@ class BossScene(BaseScene):
         event_manager.subscribe("boss_revive_begin", self._on_revive_begin)
         event_manager.subscribe("boss_revived", self._on_revived)
         event_manager.subscribe("boss_summon_minions", self._on_boss_summon)
+        event_manager.subscribe("summon_ally", self._on_summon_ally)
+        event_manager.subscribe("enemy_dead", self._on_enemy_dead)
+        event_manager.subscribe("player_buff_applied", self._on_player_buff)
 
     def on_exit(self) -> None:
         self._health_bar.detach()
@@ -131,6 +135,9 @@ class BossScene(BaseScene):
         event_manager.unsubscribe("boss_revive_begin", self._on_revive_begin)
         event_manager.unsubscribe("boss_revived", self._on_revived)
         event_manager.unsubscribe("boss_summon_minions", self._on_boss_summon)
+        event_manager.unsubscribe("summon_ally", self._on_summon_ally)
+        event_manager.unsubscribe("enemy_dead", self._on_enemy_dead)
+        event_manager.unsubscribe("player_buff_applied", self._on_player_buff)
 
     def update(self, dt: float) -> None:
         if self._finished:
@@ -178,8 +185,27 @@ class BossScene(BaseScene):
         else:
             if not self._boss.dead:
                 self._boss.update(dt, col)
-            # 玩家攻击 → Boss
-            self._hit_resolver.update(self._player, [self._boss])
+
+            # ---- 更新 Boss 召唤的小兵（AI + 物理）----
+            living_minions = []
+            for enemy in list(self._area.enemies):
+                if enemy is self._boss or enemy.dead:
+                    if enemy is not self._boss and enemy.dead:
+                        continue  # 死亡的召唤物移除
+                    if enemy is not self._boss:
+                        living_minions.append(enemy)
+                    continue
+                if enemy.status._ftm is None:
+                    enemy.status.bind_floating_text_manager(self._floating_texts)
+                # 让敌方小兵可以攻击玩家 + 友方召唤物
+                enemy.attack_targets = [self._player] + getattr(self._area, "allies", [])
+                enemy.update(dt, col)
+                living_minions.append(enemy)
+            # 保留 Boss + 存活小兵
+            self._area.enemies = [e for e in self._area.enemies if e is self._boss] + living_minions
+
+            # 玩家攻击 → Boss + 全部敌人
+            self._hit_resolver.update(self._player, [self._boss] + self._area.enemies)
 
         # ---- 抛射物更新（毒飞镖/弓箭/魔法弹等）----
         self._update_projectiles(dt)
@@ -187,6 +213,16 @@ class BossScene(BaseScene):
         # ---- 地面掉落物物理 + 自动拾取 ----
         ItemManager.update_drops(self._area, dt)
         ItemManager.try_pickup_all(self._player, self._area)
+
+        # ---- 友方召唤物更新 ----
+        for ally in getattr(self._area, "allies", []):
+            if ally.dead:
+                continue
+            if ally.status._ftm is None:
+                ally.status.bind_floating_text_manager(self._floating_texts)
+            ally.update(dt, col)
+        living_allies = [a for a in getattr(self._area, "allies", []) if not a.dead]
+        self._area.allies = living_allies
 
         # 飘字 + 摄像机 + HUD
         self._floating_texts.update(dt)
@@ -290,6 +326,15 @@ class BossScene(BaseScene):
         if not self._boss.dead or self._boss._revive_pending:
             self._boss.render(surface, cam_offset)
 
+        # Boss 召唤物（敌人阵营）
+        for enemy in self._area.enemies:
+            if enemy is not self._boss:
+                enemy.render(surface, cam_offset)
+
+        # 友方召唤物（玩家阵营）
+        for ally in getattr(self._area, "allies", []):
+            ally.render(surface, cam_offset)
+
         # 抛射物
         for p in getattr(self._area, "projectiles", []):
             p.render(surface, cam_offset)
@@ -332,6 +377,15 @@ class BossScene(BaseScene):
         self._boss_dead = False
         self._exit_open = False
 
+    def _on_enemy_dead(self, data: dict) -> None:
+        """敌人死亡 → 通知 Boss（用于召唤冷却管理）。"""
+        enemy = data.get("enemy")
+        if enemy is None or enemy is self._boss:
+            return
+        # 通知 Boss 小兵死亡
+        if hasattr(self._boss, "on_minion_died"):
+            self._boss.on_minion_died()
+
     def _on_boss_summon(self, data: dict) -> None:
         """Boss 召唤技能 → 在 Boss 房间内生成骷髅兵。"""
         boss = data.get("boss")
@@ -358,6 +412,48 @@ class BossScene(BaseScene):
             minion.status.bind_floating_text_manager(self._floating_texts)
             # 加入 Boss 房间
             self._area.enemies.append(minion)
+
+    def _on_summon_ally(self, data: dict) -> None:
+        """骷髅骨灰 → 在 Boss 房间生成友方骷髅。"""
+        ally_id = data.get("ally_id", "skeleton")
+        spawn_x = float(data.get("x", 0))
+        spawn_y = float(data.get("y", 0))
+
+        from entities.enemy.types import create_enemy
+        ally = create_enemy("undead", spawn_x, spawn_y - 32)
+        ally.team = "player"
+        # 攻击目标 = Boss + Boss 召唤物
+        ally.attack_targets = [self._boss] + self._area.enemies
+        ally.status.bind_floating_text_manager(self._floating_texts)
+        self._area.allies.append(ally)
+
+        self._floating_texts.add(
+            "● 召唤骷髅 ●",
+            spawn_x, spawn_y - 48,
+            color=(180, 220, 255),
+            size=16,
+            lifetime=1.5,
+        )
+
+    def _on_player_buff(self, data: dict) -> None:
+        """消耗品增益生效。"""
+        if self._player is None:
+            return
+        buff_type = data.get("buff_type", "")
+        value = float(data.get("value", 0))
+        duration = float(data.get("duration", 30))
+        self._player.stats.apply_buff(buff_type, value, duration)
+
+        name_map = {
+            "atk_bonus": "攻击力", "def_bonus": "防御力",
+            "weapon_fire": "火焰附魔", "weapon_holy": "神圣附魔",
+        }
+        label = name_map.get(buff_type, buff_type)
+        self._floating_texts.add(
+            f"▲ {label} +{int(value*100)}%",
+            self._player.rect.centerx, self._player.rect.top - 30,
+            color=(255, 200, 80), size=14, lifetime=2.0,
+        )
 
     def _finish_boss(self) -> None:
         self._finished = True

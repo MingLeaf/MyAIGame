@@ -778,27 +778,95 @@ data/
 - **向后兼容**：重构现有模块务必保留旧导入路径（用 re-export 或包装类）
 
 ### 4.4 推荐工作顺序
+
 窗口 1（武器）✅ 已完成
-
-窗口 2（物品）与窗口 3（敌人 AI）可**并行**推进（无强依赖）
-
-窗口 4（规则系统）依赖 1、2、3 完成
-
-窗口 5（Boss）依赖 4
+窗口 2（物品）✅ 已完成
+窗口 3（敌人 AI）✅ 已完成
+窗口 4（规则系统）✅ 已完成
+窗口 5（Boss）✅ 已完成 — 含 §4.5 补丁
 
 窗口 6（NPC）依赖 4
-
 窗口 7（特效音频）可与 6 并行
-
-窗口 8（UI）依赖 4、5、6（需要 Boss 血条 / 营地菜单）
-
+窗口 8（UI）依赖 4、5、6
 窗口 9（场景串联）依赖 8
-
 窗口 10（存档）依赖 9
-
 窗口 11（地图内容）可在 1~10 任意时间并行制作
-
 窗口 12（测试）放最后
+
+---
+
+### 4.5 第 9 阶段补丁 · 战斗与 Boss 系统深化（2026-05-14 ~ 2026-05-15）
+
+> 本轮在第 9 阶段基础上进行了大量系统级修复和功能补全，
+> 涉及 Boss AI、战斗逻辑、UI、召唤系统、Buff 道具、调试工具等 14 项变更。
+
+#### 4.5.1 Boss 场景修复（3 项）
+
+| # | 问题 | 根因 | 修复 |
+|---|------|------|------|
+| P1 | Boss 未刷新 + UI 不显示 | Boss 位置双减法 Bug；BossScene 缺少 InventoryScreen | 修正 `boss.y=ground_y`；集成背包/装备界面 + I/C 键 |
+| P2 | 从营地复活后误触雾门 | 雾门 col 94 距 cf_03 营地仅 2 列（碰撞触发） | 改为 **按 F 键交互**；雾门右移至 col 95（距营地 3 列 = 96px） |
+| P3 | 格挡不生效 + 无法弹反 Boss | `_apply_skill_hitbox()` 未传 `attacker=self` | 传入 `attacker=self`，启用弹反/格挡判定链路 |
+
+#### 4.5.2 战斗系统修复（4 项）
+
+| # | 问题 | 根因 | 修复 |
+|---|------|------|------|
+| P4 | Boss 韧性条显示不满 | `load_boss_data()` 先创建默认 `max_poise=30` 的 PoiseComponent，再设 `max_poise=80` 但组件未重建 | 加载后重建 `PoiseComponent(max_poise=80)` |
+| P5 | OHKO 跳过二阶段 + 复活不触发 | 二阶段检测在 HitResolver 前；`EnemyDeadState.on_enter()` 不调用 `on_death()` | `BaseBoss.take_damage()` 覆写：预判致死→锁血触发二阶段 + 复活检测 |
+| P6 | Boss 眩晕后仍攻击 | `DukeRotbone.update()` 未检查 `self.stunned` | 技能选择守卫条件增加 `or self.stunned` |
+| P7 | Buff 道具（锋刃石粉等）无效 | `player_buff_applied` 事件无人监听 | `PlayerStats` 新增 Buff 系统（`apply_buff` / 计时 / 百分比叠加），GameScene/BossScene 监听事件 |
+
+#### 4.5.3 Boss 召唤与友方召唤系统（新建）
+
+| 功能 | 实现 |
+|------|------|
+| **阵营标签系统** | `BaseEntity.team`（`"player"` / `"enemy"`）；`Player.team="player"` |
+| **Boss 召唤骷髅** | `DukeRotbone._do_summon()` → `boss_summon_minions` 事件 → BossScene 创建 2 只 undead（team=enemy） |
+| **召唤规则** | 最多 2 只同时存在；全灭后 10s 冷却；施法 2s（Boss 静止 + 蓝色进度条）；冷却中 `_can_summon()=False` |
+| **玩家骨粉召唤** | `SpecialItem._do_summon_ally()` → `summon_ally` 事件 → 创建 1 只 undead（team=player，`attack_targets` 指向敌人列表） |
+| **AI 通用化** | `BaseEnemy` 新增 `attack_targets` / `_get_ai_target()`；**5 个 AI 状态全部改用通用目标**（不再硬编码 `self.player`） |
+| **阵营保护** | `HitResolver` 跳过同阵营目标；血条着色：敌方红色 / 友方绿色 |
+
+#### 4.5.4 UI 改进 + 调试工具
+
+| 功能 | 说明 |
+|------|------|
+| **调试战斗模式 (F3)** | `god_mode`（玩家无敌）+ `one_hit_kill`（99999 伤害）。F3 统一切换，删除场景中重复的 F3 处理 |
+| **Boss 韧性条** | `BossHealthBar` 新增 "架势" 条（HP 下方）；`base_boss.py` 修复 `current_poise`→`poise` |
+| **血条阵营着色** | 敌方：红色系 `(160~255, 30, 20)`；友方：绿色系 `(20, 180~230, 30)` |
+| **Boss 场景 UI** | 集成 InventoryScreen / EquipmentScreen + I/C 键绑定 + 暂停逻辑 |
+
+#### 4.5.5 Boss 场景抛射物/消耗品支持
+
+| 修复 | 文件 |
+|------|------|
+| `player.current_area = self._area`（飞镖等抛射物写入正确地图） | `boss_scene.py` |
+| 新增 `_update_projectiles()` + `ItemManager` 更新 | `boss_scene.py` |
+| 抛射物渲染 + 敌人攻击友方 `attack_targets` | `boss_scene.py` + `game_scene.py` |
+
+#### 4.5.6 修改文件总览
+
+| 文件 | 变更类型 |
+|------|----------|
+| `entities/base_entity.py` | + `team` 字段 |
+| `entities/player/player.py` | `team="player"` |
+| `entities/player/player_stats.py` | + Buff 系统（`apply_buff` / `_update_buffs` / `_recalc_buffs`） |
+| `entities/player/player_combat.py` | + God Mode 检查 |
+| `entities/enemy/base_enemy.py` | + `attack_targets` / `_get_ai_target()` / `_distance_to_target()` / 血条阵营着色 |
+| `entities/enemy/enemy_ai.py` | **5 状态全部改用 `_get_ai_target()`** |
+| `entities/enemy/bosses/base_boss.py` | 重写 `take_damage()`（二阶段保护 + 复活 + 真死）；修复 `_do_revive()` FSM 重置；PoiseComponent 重建；`current_poise` 修正 |
+| `entities/enemy/bosses/duke_rotbone.py` | 完整重写：召唤规则/冷却/施法进度条/眩晕检测 + `import pygame` |
+| `combat/hit_resolver.py` | 同阵营跳过 + OHKO 覆写 |
+| `map/area.py` | + `allies` 列表；雾门 col 94→95 |
+| `map/boss_room.py` | 碰撞触发 → 按键交互（`try_interact` + F 键） |
+| `scenes/boss_scene.py` | 大量：`current_area` / 抛射物 / 物品 / Buff / 小兵更新 / 友军 / 死亡回调 / UI / 按键 |
+| `scenes/game_scene.py` | 雾门交互 / `attack_targets` / Buff / 友军更新渲染 / 删除 F3 |
+| `ui/boss_healthbar.py` | + 架势韧性条 |
+| `utils/debug.py` | + `god_mode` / `one_hit_kill` |
+| `core/game.py` | F3 同步 4 标志（删除场景中的冲突处理） |
+| `data/maps/area_graveyard/tilemap.json` | 雾门 col 94→95 |
+| `_test_stage9_boss.py` | atk 期望值 35→23 |
 
 ---
 

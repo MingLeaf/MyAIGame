@@ -384,7 +384,7 @@ class BaseBoss(BaseEnemy):
 
         # ---- 韧性条（Boss 底部小条）----
         poise_max = float(getattr(self.stats, "max_poise", 80.0))
-        poise_cur = float(getattr(self.stats, "current_poise", poise_max))
+        poise_cur = float(getattr(self.stats, "poise", poise_max))
         if poise_max > 0:
             poise_ratio = max(0.0, min(1.0, poise_cur / poise_max))
             bar_w = self.rect.width

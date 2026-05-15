@@ -113,6 +113,8 @@ class GameScene(BaseScene):
         event_manager.subscribe("death_relic_recovered",  self._on_death_relic_recovered)
         event_manager.subscribe("player_leveled_up",      self._on_player_leveled_up)
         event_manager.subscribe("consumables_refilled",   self._on_consumables_refilled)
+        event_manager.subscribe("summon_ally",           self._on_summon_ally)
+        event_manager.subscribe("player_buff_applied",   self._on_player_buff)
 
         self._loaded = True
 
@@ -127,6 +129,8 @@ class GameScene(BaseScene):
         event_manager.unsubscribe("death_relic_recovered",  self._on_death_relic_recovered)
         event_manager.unsubscribe("player_leveled_up",      self._on_player_leveled_up)
         event_manager.unsubscribe("consumables_refilled",   self._on_consumables_refilled)
+        event_manager.unsubscribe("summon_ally",            self._on_summon_ally)
+        event_manager.unsubscribe("player_buff_applied",    self._on_player_buff)
 
     def on_resume(self):
         """从 BossScene pop 后恢复：重置雾门触发标记，允许再次进入。"""
@@ -323,6 +327,53 @@ class GameScene(BaseScene):
             lifetime=1.8,
         )
 
+    def _on_player_buff(self, data: dict) -> None:
+        """消耗品增益生效：应用到 PlayerStats。"""
+        if self._player is None:
+            return
+        buff_type = data.get("buff_type", "")
+        value = float(data.get("value", 0))
+        duration = float(data.get("duration", 30))
+        self._player.stats.apply_buff(buff_type, value, duration)
+
+        # 飘字
+        name_map = {
+            "atk_bonus": "攻击力", "def_bonus": "防御力",
+            "weapon_fire": "火焰附魔", "weapon_holy": "神圣附魔",
+        }
+        label = name_map.get(buff_type, buff_type)
+        self._floating_texts.add(
+            f"▲ {label} +{int(value*100)}%",
+            self._player.rect.centerx, self._player.rect.top - 30,
+            color=(255, 200, 80), size=14, lifetime=2.0,
+        )
+
+    def _on_summon_ally(self, data: dict) -> None:
+        """使用骷髅骨灰 → 生成友方骷髅兵。"""
+        ally_id = data.get("ally_id", "skeleton")
+        spawn_x = float(data.get("x", 0))
+        spawn_y = float(data.get("y", 0))
+
+        from entities.enemy.types import create_enemy
+        # 用 undead 类型创建友方骷髅
+        ally = create_enemy("undead", spawn_x, spawn_y - 32)
+        ally.team = "player"
+        # 将敌人列表作为攻击目标
+        ally.attack_targets = self._area.enemies
+        # 绑定飘字
+        ally.status.bind_floating_text_manager(self._floating_texts)
+        # 加入区域盟友列表
+        self._area.allies.append(ally)
+
+        # 飘字提示
+        self._floating_texts.add(
+            "● 召唤骷髅 ●",
+            spawn_x, spawn_y - 48,
+            color=(180, 220, 255),
+            size=16,
+            lifetime=1.5,
+        )
+
     # ----------------------------------------------------------------
     # 抛射物（弓箭 / 魔法弹 / 毒飞镖）每帧更新
     # ----------------------------------------------------------------
@@ -499,6 +550,8 @@ class GameScene(BaseScene):
             # 确保飘字管理器已绑定
             if enemy.status._ftm is None:
                 enemy.status.bind_floating_text_manager(self._floating_texts)
+            # 让敌人也可以攻击玩家的友方召唤物
+            enemy.attack_targets = [self._player] + getattr(self._area, "allies", [])
             enemy.update(dt, self._area.collision)
             if not enemy.dead:
                 living.append(enemy)
@@ -509,6 +562,18 @@ class GameScene(BaseScene):
 
         # ---- 抛射物更新 + 命中（玩家弓 / 敌人弓箭手 / 法师 / 毒飞镖）----
         self._update_projectiles(dt)
+
+        # ---- 友方召唤物更新（AI + 物理 + 攻击敌人）----
+        for ally in getattr(self._area, "allies", []):
+            if ally.dead:
+                continue
+            if ally.status._ftm is None:
+                ally.status.bind_floating_text_manager(self._floating_texts)
+            ally.update(dt, self._area.collision)
+            # 友方 AI 自动攻击敌人（由 attack_targets 驱动）
+        # 清理死亡友军
+        living_allies = [a for a in getattr(self._area, "allies", []) if not a.dead]
+        self._area.allies = living_allies
 
         # ---- 地面掉落物物理 + 自动拾取（第 6 阶段）----
         ItemManager.update_drops(self._area, dt)
@@ -549,6 +614,10 @@ class GameScene(BaseScene):
         # 4. 敌人
         for enemy in self._area.enemies:
             enemy.render(surface, cam_offset)
+
+        # 4.2 友方召唤物
+        for ally in getattr(self._area, "allies", []):
+            ally.render(surface, cam_offset)
 
         # 4.5 抛射物
         for p in getattr(self._area, "projectiles", []):

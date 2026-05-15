@@ -86,7 +86,8 @@ class PlayerStats:
     # ----------------------------------------------------------------
 
     def update(self, dt: float):
-        """每帧自动恢复耐力。"""
+        """每帧自动恢复耐力 + 推进 Buff 计时。"""
+        # 耐力恢复
         if self._stamina_consumed:
             self._stamina_regen_timer = self.STAMINA_DELAY
             self._stamina_consumed = False
@@ -96,6 +97,8 @@ class PlayerStats:
             else:
                 self.stamina = min(self.max_stamina,
                                    self.stamina + self.STAMINA_REGEN * dt)
+        # Buff 计时
+        self._update_buffs(dt)
 
     # ----------------------------------------------------------------
     # HP
@@ -199,3 +202,60 @@ class PlayerStats:
     @property
     def mana_ratio(self) -> float:
         return self.mana / self.max_mana if self.max_mana > 0 else 0.0
+
+    # ----------------------------------------------------------------
+    # Buff 系统（战斗增益消耗品）
+    # ----------------------------------------------------------------
+
+    def __init_post_buff__(self):
+        """在 __init__ 后调用一次，确保 _active_buffs 存在。"""
+        if not hasattr(self, "_active_buffs"):
+            self._active_buffs: list[dict] = []
+            # 已应用的 buff 贡献值（叠加后清零用）
+            self._buff_atk_pct:   float = 0.0
+            self._buff_def_pct:   float = 0.0
+
+    def apply_buff(self, buff_type: str, value: float, duration: float) -> None:
+        """应用一个战斗增益。"""
+        self.__init_post_buff__()
+
+        # 移除同类型旧 buff（不叠加，取最大值逻辑简化）
+        self._active_buffs = [b for b in self._active_buffs if b["type"] != buff_type]
+
+        buf = {"type": buff_type, "value": value, "duration": duration, "remaining": duration}
+        self._active_buffs.append(buf)
+        self._recalc_buffs()
+
+    def _update_buffs(self, dt: float) -> None:
+        """每帧推进 buff 计时，过期自动移除。"""
+        if not hasattr(self, "_active_buffs") or not self._active_buffs:
+            return
+        changed = False
+        for buf in self._active_buffs:
+            buf["remaining"] -= dt
+            if buf["remaining"] <= 0:
+                changed = True
+        if changed:
+            self._active_buffs = [b for b in self._active_buffs if b["remaining"] > 0]
+            self._recalc_buffs()
+
+    def _recalc_buffs(self) -> None:
+        """根据当前 _active_buffs 重新计算百分比加成。"""
+        # 撤销旧的 buff 贡献
+        self.atk_bonus_pct -= self._buff_atk_pct
+        self.def_bonus_pct -= self._buff_def_pct
+
+        self._buff_atk_pct = 0.0
+        self._buff_def_pct = 0.0
+
+        for buf in self._active_buffs:
+            t = buf["type"]
+            v = float(buf["value"])
+            if t == "atk_bonus":
+                self._buff_atk_pct += v
+            elif t == "def_bonus":
+                self._buff_def_pct += v
+            # weapon_fire / weapon_holy 由 HitResolver 的 element 字段处理
+
+        self.atk_bonus_pct += self._buff_atk_pct
+        self.def_bonus_pct += self._buff_def_pct

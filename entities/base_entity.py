@@ -39,6 +39,11 @@ class BaseEntity:
         self.active: bool = True
         self.dead:   bool = False
 
+        # 阵营标签：用于判断敌我关系
+        #   "player" — 玩家 + 玩家召唤物
+        #   "enemy"  — 敌人 + Boss + Boss召唤物
+        self.team: str = "enemy"
+
         # 速度（像素/秒）
         self.vel_x: float = 0.0
         self.vel_y: float = 0.0
