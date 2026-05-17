@@ -19,6 +19,7 @@ from combat.damage_calculator import (
 )
 from combat.floating_text  import FloatingTextManager
 from combat.status_effect  import BleedEffect
+from core.event_manager    import event_manager
 
 if TYPE_CHECKING:
     from entities.player.player import Player
@@ -33,9 +34,11 @@ _BLEED_STACK_PER_HIT = 30.0
 
 
 def _post_hit_sound(sound_name: str = "hit_flesh") -> None:
-    """发布打击音效事件到 pygame 事件队列。"""
+    """发布打击音效事件到 pygame 事件队列（旧机制兼容）+ 事件总线。"""
     evt = pygame.event.Event(HIT_EVENT_TYPE, {"sound": sound_name})
     pygame.event.post(evt)
+    # 第 11 阶段：同步发送到事件总线，供 SFXPlayer 订阅
+    event_manager.emit("enemy_hit", {"sound": sound_name})
 
 
 class HitResolver:
@@ -173,6 +176,25 @@ class HitResolver:
             bleed = enemy.status.get("bleed")
             if bleed is not None:
                 bleed.add_stack(bleed_stack)
+
+        # 6b. 施加中毒积累（第 11 阶段补丁：从 hitbox 的 poison_stack 读取）
+        from combat.status_effect import PoisonEffect
+        poison_stack = getattr(hb, "poison_stack", 0.0)
+        if poison_stack > 0 and hasattr(enemy, "status"):
+            if not enemy.status.has("poison"):
+                enemy.status.add(PoisonEffect(duration=30.0))
+            poison = enemy.status.get("poison")
+            if poison is not None and hasattr(poison, "add_stack"):
+                poison.add_stack(poison_stack)
+
+        # 6c. 元素附加效果（第 11 阶段：非物理元素命中触发状态异常）
+        from combat.status_effect import BurnEffect, FreezeEffect
+        elem = hit_info.element
+        if hasattr(enemy, "status"):
+            if elem == "fire" and not enemy.status.has("burn"):
+                enemy.status.add(BurnEffect(duration=8.0))
+            elif elem == "ice" and not enemy.status.has("freeze"):
+                enemy.status.add(FreezeEffect(duration=2.0))
 
         # 7. 飘字
         if self._ftm is not None:

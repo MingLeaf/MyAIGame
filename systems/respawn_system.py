@@ -78,6 +78,13 @@ class RespawnSystem:
         player.invincible = False
         player.hurt_timer = 0.0
 
+        # ---- 3b. 清除所有状态异常（第 11 阶段）----
+        if hasattr(player, "status"):
+            for name in ("poison", "burn", "freeze", "bleed", "curse", "stun"):
+                if player.status.has(name):
+                    event_manager.emit("status_removed", {"entity": player, "status": name})
+                    player.status.remove(name)
+
         # ---- 4. 补满消耗品 ----
         CampfireSystem._refill_consumables(player)
 

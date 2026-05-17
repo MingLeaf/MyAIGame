@@ -336,7 +336,71 @@ class _AttackBaseState(PlayerState):
             "poise_damage": wd.poise_damage,
             "knockback":    wd.knockback,
             "bleed_stack":  wd.bleed_stack,
+            "poison_stack": wd.poison_stack,
         }
+
+    @staticmethod
+    def _should_fire_projectile(weapon) -> bool:
+        """判断武器是否为远程（攻击时生成抛射物而非近战 hitbox）。"""
+        from weapons.base_weapon import WeaponType
+        wt = getattr(weapon, "weapon_type", "")
+        return wt in (WeaponType.BOW, WeaponType.STAFF)
+
+    def _fire_projectile(self, weapon, p: "Player", data: dict) -> None:
+        """发射远程抛射物（弓/法杖）——复用与敌人弓箭手 AI 完全相同的逻辑。"""
+        import logging
+        _log = logging.getLogger(__name__)
+        from weapons.base_weapon import WeaponType
+        from physics.projectile import Arrow, MagicBall
+
+        wt = getattr(weapon, "weapon_type", "")
+
+        area = getattr(p, "current_area", None)
+        if area is None or not hasattr(area, "projectiles"):
+            _log.warning("_fire_projectile: area 无效")
+            return
+
+        facing = p.facing or 1
+
+        if wt == WeaponType.BOW:
+            # 与 archer._fire_arrow 完全一致的发射逻辑
+            from weapons.types.bow import _consume_arrow
+            if not _consume_arrow(p):
+                return
+            wd = weapon.get_light_attack(0) if not self._is_heavy else weapon.get_heavy_attack()
+            spawn_x = p.rect.centerx + facing * 14
+            spawn_y = p.rect.centery - 4
+            arrow = Arrow(
+                x=spawn_x, y=spawn_y,
+                vx=700.0 * facing if not self._is_heavy else 820.0 * facing,
+                vy=-40.0,
+                damage=wd.damage,
+                owner=p,
+                element=wd.element,
+                poise_damage=wd.poise_damage,
+                lifetime=2.0,
+            )
+            area.projectiles.append(arrow)
+            _log.debug("_fire_projectile BOW: arrow at (%d,%d) vx=%d dmg=%d → projectiles=%d",
+                       int(spawn_x), int(spawn_y), int(arrow.vx), arrow.damage,
+                       len(area.projectiles))
+
+        elif wt == WeaponType.STAFF:
+            wd = weapon.get_heavy_attack()
+            ball = MagicBall(
+                x=p.rect.centerx + facing * 18,
+                y=p.rect.centery - 4,
+                vx=560.0 * facing,
+                vy=0.0,
+                damage=wd.damage,
+                owner=p,
+                element=wd.element,
+                poise_damage=wd.poise_damage,
+                lifetime=2.5,
+            )
+            area.projectiles.append(ball)
+            _log.debug("_fire_projectile STAFF: ball at (%d,%d) vx=%d",
+                       int(ball.x), int(ball.y), int(ball.vx))
 
     def on_enter(self, prev_state=None):
         p = self.player
@@ -348,8 +412,16 @@ class _AttackBaseState(PlayerState):
         self._frame           = 0
         p.vel_x               = 0.0
 
+        # ---- 远程武器：在 on_enter 时生成抛射物，不再创建 hitbox ----
+        weapon = getattr(p, "weapon", None)
+        if weapon is not None and self._should_fire_projectile(weapon):
+            self._fire_projectile(weapon, p, data)
+            # 标记本轮攻击已发射，update 中不再生成 hitbox
+            self._projectile_fired = True
+        else:
+            self._projectile_fired = False
+
         # 初始化 ComboWindow：连段输入窗口在「判定帧开始时」打开
-        # 这样玩家可以在判定生效后的任意时间预输入下一段
         if self._combo:
             chain = ComboChain([self.name, self._combo])
             self._combo_window.reset(chain, self.name,
@@ -361,9 +433,9 @@ class _AttackBaseState(PlayerState):
         self._frame += 1
         self._combo_window.tick()
 
-        # 在判定帧内生成攻击框
+        # 在判定帧内生成攻击框（远程武器已发射抛射物则跳过）
         if data["pre"] <= self._frame < data["pre"] + data["active"]:
-            if self._frame == data["pre"]:
+            if self._frame == data["pre"] and not self._projectile_fired:
                 from entities.player.attack_hitbox import AttackHitbox
                 hb = AttackHitbox(
                     owner_rect    = p.rect,
@@ -378,6 +450,7 @@ class _AttackBaseState(PlayerState):
                     element       = data.get("element", "none"),
                     poise_damage  = data.get("poise_damage", 10.0),
                     bleed_stack   = data.get("bleed_stack", 0.0),
+                    poison_stack  = data.get("poison_stack", 0.0),
                     source        = p,
                 )
                 p.active_hitboxes.append(hb)

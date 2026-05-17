@@ -1,0 +1,79 @@
+{
+  "_comment": "商人莉亚的商店数据。category: consumable/weapon/armor。item_id 必须与 item_database 一致。",
+  "npc_id": "merchant_lia",
+  "npc_name": "商人 莉亚",
+  "greeting": "欢迎！我是莉亚，行走在烬土的旅行商人。货真价实，童叟无欺！",
+
+  "categories": [
+    {
+      "name": "消耗品",
+      "items": [
+        {"item_id": "heal_potion_small",    "price": 30},
+        {"item_id": "heal_potion_large",    "price": 120},
+        {"item_id": "mana_potion_basic",    "price": 60},
+        {"item_id": "stamina_potion_basic", "price": 50},
+        {"item_id": "antidote_universal",   "price": 80},
+        {"item_id": "arrow",                "price": 5},
+        {"item_id": "poison_dart",          "price": 20},
+        {"item_id": "buff_sharp_powder",    "price": 100},
+        {"item_id": "buff_holy_oil",        "price": 80},
+        {"item_id": "buff_flame_resin",     "price": 120},
+        {"item_id": "buff_iron_skin",       "price": 90},
+        {"item_id": "buff_berserk",         "price": 250},
+        {"item_id": "curse_remover_charm",  "price": 150},
+        {"item_id": "skeleton_ashes",       "price": 300},
+        {"item_id": "teleport_stone",       "price": 200},
+        {"item_id": "trap_bomb",            "price": 100}
+      ]
+    },
+    {
+      "name": "武器",
+      "items": [
+        {"item_id": "knight_sword",          "price": 1000},
+        {"item_id": "ember_blade",           "price": 2500},
+        {"item_id": "moonlight_sword",       "price": 5000},
+        {"item_id": "battle_axe",            "price": 1500},
+        {"item_id": "berserker_axe",         "price": 3500},
+        {"item_id": "shadow_dagger",         "price": 800},
+        {"item_id": "venom_fang",            "price": 1800},
+        {"item_id": "crusader_greatsword",   "price": 3500},
+        {"item_id": "dragonbone_greatsword", "price": 7000},
+        {"item_id": "iron_spear",            "price": 1200},
+        {"item_id": "thunder_partisan",      "price": 3200},
+        {"item_id": "hunter_bow",            "price": 800},
+        {"item_id": "elven_longbow",         "price": 2000},
+        {"item_id": "arcane_staff",          "price": 1000},
+        {"item_id": "frost_staff",           "price": 2000},
+        {"item_id": "holy_tome",             "price": 3000},
+        {"item_id": "judgement_tome",        "price": 5500}
+      ]
+    },
+    {
+      "name": "护甲",
+      "items": [
+        {"item_id": "knight_helm",    "price": 500},
+        {"item_id": "knight_chest",   "price": 1000},
+        {"item_id": "knight_hands",   "price": 300},
+        {"item_id": "knight_legs",    "price": 600},
+        {"item_id": "ranger_hood",    "price": 200},
+        {"item_id": "ranger_vest",    "price": 400},
+        {"item_id": "ranger_gloves",  "price": 100},
+        {"item_id": "ranger_boots",   "price": 200},
+        {"item_id": "mage_hat",       "price": 400},
+        {"item_id": "mage_robe",      "price": 800},
+        {"item_id": "mage_gloves",    "price": 300},
+        {"item_id": "mage_trousers",  "price": 500}
+      ]
+    },
+    {
+      "name": "材料",
+      "items": [
+        {"item_id": "ember_chunk",          "price": 100},
+        {"item_id": "sharp_stone",          "price": 150},
+        {"item_id": "heavy_iron",           "price": 170},
+        {"item_id": "blessed_bone",         "price": 180},
+        {"item_id": "elemental_essence",    "price": 200}
+      ]
+    }
+  ]
+}

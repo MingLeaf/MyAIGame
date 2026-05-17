@@ -250,65 +250,71 @@ class ItemDatabase:
         from weapons.greatsword import Greatsword
         from weapons.dagger     import Dagger
         from weapons.holy_tome  import HolyTome
+        from weapons.types.spear import Spear
+        from weapons.types.axe   import Axe
+        from weapons.types.bow   import Bow
+        from weapons.types.staff import Staff
 
-        sword_obj = Sword()
-        self.register(WeaponItem(
-            item_id     = "sword_iron",
-            name        = "铁制骑士剑",
-            description = "标准骑士剑，攻守均衡。战技：旋风斩 — 360度旋转斩击，打飞周围敌人。",
-            icon_id     = 10,
-            weight      = 3.0,
-            base_atk    = 22,
-            str_scale   = 0.5,
-            dex_scale   = 0.5,
-            weapon_art  = "旋风斩",
-            weapon_obj  = sword_obj,
-        ))
+        # 武器类型 → 武器类 + 伤害标尺
+        _WPN_META = {
+            "sword":      (Sword,      "sword_list.json"),
+            "greatsword": (Greatsword, "greatsword_list.json"),
+            "dagger":     (Dagger,     "dagger_list.json"),
+            "holy_tome":  (HolyTome,   "holy_tome_list.json"),
+            "spear":      (Spear,      "spear_list.json"),
+            "axe":        (Axe,        "axe_list.json"),
+            "bow":        (Bow,        "bow_list.json"),
+            "staff":      (Staff,      "staff_list.json"),
+        }
 
-        from weapons.greatsword import Greatsword
-        gs_obj = Greatsword()
-        self.register(WeaponItem(
-            item_id     = "greatsword_iron",
-            name        = "铁制大剑",
-            description = "沉重的大剑，一击可撼动盾牌。战技：天崩地裂 — 跳起重劈，震地击晕。",
-            icon_id     = 11,
-            weight      = 6.0,
-            base_atk    = 45,
-            str_scale   = 0.8,
-            dex_scale   = 0.0,
-            weapon_art  = "天崩地裂",
-            weapon_obj  = gs_obj,
-        ))
+        for wpn_type, (obj_cls, json_file) in _WPN_META.items():
+            json_data = load_from_data_dir(f"weapons/{json_file}")
+            if not json_data:
+                logger.warning("ItemDatabase: 武器 JSON 不存在: weapons/%s", json_file)
+                continue
+            weapons = json_data.get("weapons", [])
+            for w in weapons:
+                item_id = w["id"]
+                # 稀有度 → 伤害加成倍率
+                rarity_scale = {"common": 1.0, "rare": 1.3, "legendary": 1.6}
+                scale = rarity_scale.get(w.get("rarity", "common"), 1.0)
+                base_atk = int((w.get("base_light_dmg", 10) + w.get("base_heavy_dmg", 20)) / 2 * scale)
 
-        from weapons.dagger import Dagger
-        dagger_obj = Dagger()
-        self.register(WeaponItem(
-            item_id     = "dagger_bone",
-            name        = "骨刃匕首",
-            description = "轻巧短刃，连击速度极快，易造成流血。战技：幻影步 — 瞬移至敌人身后背刺。",
-            icon_id     = 12,
-            weight      = 1.0,
-            base_atk    = 15,
-            str_scale   = 0.0,
-            dex_scale   = 0.8,
-            weapon_art  = "幻影步",
-            weapon_obj  = dagger_obj,
-        ))
+                # 创建武器实例并注入 JSON 属性
+                weapon_instance = obj_cls()
+                sta = w.get("stamina", {})
+                kb  = w.get("knockback", {})
+                weapon_instance.configure(
+                    display_name      = w.get("display_name", item_id),
+                    color             = tuple(w.get("color", [180, 180, 180])),
+                    light_dmg         = w.get("base_light_dmg"),
+                    heavy_dmg         = w.get("base_heavy_dmg"),
+                    element           = w.get("element", "physical"),
+                    bleed_stack       = w.get("bleed_stack_light", 0.0),
+                    poison_stack      = w.get("poison_stack_light", 0.0),
+                    light_stamina     = sta.get("light", 12.0),
+                    heavy_stamina     = sta.get("heavy", 28.0),
+                    light_knockback   = kb.get("light", 160.0),
+                    heavy_knockback   = kb.get("heavy", 260.0),
+                )
 
-        from weapons.holy_tome import HolyTome
-        holy_obj = HolyTome()
-        self.register(WeaponItem(
-            item_id     = "holy_tome_basic",
-            name        = "信徒圣典",
-            description = "信仰者的圣经，可施展神圣奇迹。战技：神圣之光 — 释放冲击波+自我治疗。",
-            icon_id     = 13,
-            weight      = 1.5,
-            base_atk    = 5,
-            str_scale   = 0.0,
-            dex_scale   = 0.0,
-            weapon_art  = "神圣之光",
-            weapon_obj  = holy_obj,
-        ))
+                self.register(WeaponItem(
+                    item_id     = item_id,
+                    name        = w.get("display_name", item_id),
+                    description = w.get("description", ""),
+                    icon_id     = w.get("icon_id", 0),
+                    weight      = float(sta.get("light", 12)) / 4.0,
+                    base_atk    = base_atk,
+                    str_scale   = 0.3 + 0.3 * scale,
+                    dex_scale   = 0.3 + 0.3 * scale,
+                    weapon_art  = w.get("weapon_art", ""),
+                    weapon_obj  = weapon_instance,
+                ))
+                logger.debug("ItemDatabase: 注册武器 %s (%s) elem=%s bleed=%.0f poison=%.0f",
+                             item_id, wpn_type,
+                             w.get("element", "physical"),
+                             w.get("bleed_stack_light", 0.0),
+                             w.get("poison_stack_light", 0.0))
 
 
 # 全局单例

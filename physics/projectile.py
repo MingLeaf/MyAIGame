@@ -59,7 +59,9 @@ class Projectile:
                  height:       int   = 6,
                  element:      str   = "none",
                  poise_damage: float = 5.0,
-                 knockback:    float = 100.0):
+                 knockback:    float = 100.0,
+                 bleed_stack:  float = 0.0,
+                 poison_stack: float = 0.0):
         self.x: float  = float(x)
         self.y: float  = float(y)
         self.vx: float = float(vx)
@@ -78,14 +80,13 @@ class Projectile:
         self.element:      str   = element
         self.poise_damage: float = poise_damage
         self.knockback:    float = knockback
+        # 状态积累（第 11 阶段：从武器/物品配置透传）
+        self.bleed_stack:  float = bleed_stack
+        self.poison_stack: float = poison_stack
 
         self.alive:   bool = True
         self._age:    float = 0.0
         self._hit_targets: set = set()   # 已命中目标（避免重复结算）
-
-    # ----------------------------------------------------------------
-    # 每帧更新
-    # ----------------------------------------------------------------
 
     def update(self,
                dt: float,
@@ -113,8 +114,9 @@ class Projectile:
 
         # 环境碰撞
         if collision_map is not None and self._check_env_collision(collision_map):
-            self.on_environment_hit()
-            return
+            if self._age > 0.1:
+                self.on_environment_hit()
+                return
 
         # 实体命中
         if targets:
@@ -128,7 +130,6 @@ class Projectile:
                 rect = getattr(tgt, "rect", None)
                 if rect is None or not self.rect.colliderect(rect):
                     continue
-                # 死亡跳过
                 if getattr(tgt, "is_dead", False):
                     continue
                 self._hit_targets.add(id(tgt))
@@ -139,10 +140,13 @@ class Projectile:
     # ----------------------------------------------------------------
 
     def on_hit(self, target) -> None:
-        """命中目标时调用。默认：施加伤害并销毁。"""
+        """命中目标时调用。默认：施加伤害 + 状态积累 + 销毁。"""
+        import logging
+        _log = logging.getLogger(__name__)
         if hasattr(target, "take_damage"):
             kb_dir = 1 if self.vx >= 0 else -1
-            # 优先尝试带 element 的新签名（玩家受击需要走护甲 / 魔法抗性分流）
+            _log.debug("Projectile.on_hit: dmg=%d elem=%s target=%s",
+                       self.damage, self.element, type(target).__name__)
             try:
                 target.take_damage(self.damage, kb_dir,
                                    element=self.element,
@@ -153,10 +157,41 @@ class Projectile:
                                        poise_damage=self.poise_damage)
                 except TypeError:
                     target.take_damage(self.damage, kb_dir)
+
+        # 施加状态积累（bleed / poison + 元素附加）
+        if hasattr(target, "status"):
+            from combat.status_effect import (
+                BleedEffect, PoisonEffect, BurnEffect, FreezeEffect,
+            )
+            bleed = getattr(self, "bleed_stack", 0.0)
+            if bleed > 0:
+                if not target.status.has("bleed"):
+                    target.status.add(BleedEffect())
+                bf = target.status.get("bleed")
+                if bf is not None:
+                    bf.add_stack(bleed)
+            poison = getattr(self, "poison_stack", 0.0)
+            if poison > 0:
+                if not target.status.has("poison"):
+                    target.status.add(PoisonEffect(duration=30.0))
+                pf = target.status.get("poison")
+                if pf is not None and hasattr(pf, "add_stack"):
+                    pf.add_stack(poison)
+            # 元素附加（fire/ice）
+            elem = self.element
+            if elem == "fire" and not target.status.has("burn"):
+                target.status.add(BurnEffect(duration=8.0))
+            elif elem == "ice" and not target.status.has("freeze"):
+                target.status.add(FreezeEffect(duration=2.0))
+
         self.alive = False
 
     def on_environment_hit(self) -> None:
         """命中环境（墙壁/地面）时调用。默认：销毁。"""
+        import logging
+        logging.getLogger(__name__).debug(
+            "Projectile.on_environment_hit: pos=(%d,%d) age=%.2f",
+            int(self.x), int(self.y), self._age)
         self.alive = False
 
     # ----------------------------------------------------------------

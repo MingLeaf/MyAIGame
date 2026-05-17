@@ -29,7 +29,7 @@ def _spawn_magic_ball(player: "Player", area, *,
                       vy: float = 0.0,
                       poise_damage: float = 8.0,
                       lifetime: float = 2.5):
-    """生成一颗 MagicBall 并加入 area.projectiles。"""
+    """生成一颗 MagicBall 并加入 area.projectiles。返回 ball 或 None。"""
     from physics.projectile import MagicBall
     ball = MagicBall(
         x = player.rect.centerx + (player.facing or 1) * 18,
@@ -44,7 +44,8 @@ def _spawn_magic_ball(player: "Player", area, *,
     )
     if area is not None and hasattr(area, "projectiles"):
         area.projectiles.append(ball)
-    return ball
+        return ball
+    return None
 
 
 class StaffArcaneBarrageArt(WeaponArt):
@@ -132,13 +133,13 @@ class Staff(BaseWeapon):
     def cast_magic_ball(self, player: "Player", area):
         """
         重攻击对外接口：扣灵力 + 发射一颗 MagicBall。
-        若灵力不足返回 None。
+        若灵力不足或 area 无效返回 None。
         """
         stats = getattr(player, "stats", None)
         if stats is not None and not stats.consume_mana(self.HEAVY_MANA_COST):
             return None
         wd = self.get_heavy_attack()
-        return _spawn_magic_ball(
+        ball = _spawn_magic_ball(
             player, area,
             damage=wd.damage,
             element=wd.element,
@@ -147,3 +148,7 @@ class Staff(BaseWeapon):
             poise_damage=wd.poise_damage,
             lifetime=2.5,
         )
+        # 若 area 无效导致魔法弹未加入 projectiles，返还灵力
+        if ball is None and stats is not None:
+            stats.mana = min(stats.max_mana, stats.mana + self.HEAVY_MANA_COST)
+        return ball

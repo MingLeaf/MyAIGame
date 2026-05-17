@@ -518,6 +518,8 @@ class CampfireMenu:
             return True
         target = self._teleport_targets[self._teleport_selected]
         target_area = target.get("area_id", "")
+        target_x = target.get("x", 0)
+        target_y = target.get("y", 0)
 
         if not target_area:
             self._message = "传送失败：无效目标"
@@ -533,18 +535,25 @@ class CampfireMenu:
             self._msg_timer = 1.5
             return True
 
-        # 先休息再传送（第 10 阶段）
+        # 先休息再传送
         from systems.campfire_system import CampfireSystem
         CampfireSystem.rest(self._player, area=None)
 
-        # 关闭菜单
+        # 更新复活营地 + 设置玩家位置
+        campfire_id = target.get("campfire_id", "")
+        if campfire_id:
+            CampfireSystem.activate(campfire_id, target_area, target_x, target_y)
+
+        # 关闭菜单，传送。保留当前玩家状态。
         self.visible = False
         self._show_teleport_panel = False
 
-        # 切换到目标区域
         from core.scene_manager import scene_manager
         from scenes.game_scene import GameScene
-        scene_manager.replace(GameScene(area_id=target_area))
+        scene = GameScene(area_id=target_area, restart=True,
+                          _teleport_x=target_x, _teleport_y=target_y,
+                          _existing_player=self._player)
+        scene_manager.replace(scene)
         return True
 
     def _render_teleport_panel(self, surface: pygame.Surface, p: "Player") -> None:

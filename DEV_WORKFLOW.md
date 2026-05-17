@@ -2,10 +2,11 @@
 
 > 本文档记录已完成工作 + 拆分剩余开发任务为可复制到不同窗口的提示词。
 > 每段提示词都是「自包含」的：贴入新窗口即可让 AI 助手接续工作。
+> 最后更新：2026-05-15（第 11 阶段完成）
 
 ---
 
-## 一、当前工程状态总结（截至第 10 阶段完成）
+## 一、当前工程状态总结（截至第 11 阶段完成）
 
 ### 1.1 已完成阶段
 
@@ -21,6 +22,7 @@
 | 第 8 阶段 | 游戏规则核心（灵魂碎片/死亡复活/营地/升级/强化/进度） | ✅ 完成 |
 | 第 9 阶段 | Boss 系统（BaseBoss + 腐骨公爵 + 雾门 + 血条 + BossScene） | ✅ 完成 |
 | 第 10 阶段 | NPC 与对话系统（营地NPC/铁匠/商人/对话引擎） | ✅ 完成 |
+| 第 11 阶段 | 粒子特效与音频 + 商店系统 + 战斗修复 | ✅ 完成 |
 
 ### 1.2 实际目录结构（已实现的关键模块）
 
@@ -62,8 +64,12 @@ systems/     loot_system (Stage7)
              progression_system / upgrade_system / quest_system (NEW Stage8)
 ui/          font_manager / hud / inventory_screen / equipment_screen
              death_screen / campfire_menu / dialogue_box（NEW Stage10）
-             boss_healthbar（NEW Stage9）
+             boss_healthbar（NEW Stage9） / shop_screen（NEW Stage11）
 scenes/      base_scene / main_menu_scene / game_scene / pause_scene
+             boss_scene（NEW Stage9）
+animation/   animation_clip / sprite_sheet_loader / animation_state_machine
+             animator / particle_system（NEW Stage11）
+audio/       sfx_player / bgm_player / audio_manager（NEW Stage11）
 data/
   maps/area_graveyard/{tilemap, enemy_spawns}.json (NEW Stage7)
   maps/world_config.json
@@ -601,7 +607,7 @@ data/
 
 ---
 
-### 窗口 7 · 第 11 阶段：粒子特效与音频
+### 窗口 7 · 第 11 阶段：粒子特效与音频 ✅ 已完成
 
 **本次任务**：让战斗有视觉/听觉反馈，区域有专属 BGM。
 
@@ -793,7 +799,7 @@ data/
 窗口 5（Boss）✅ 已完成 — 含 §4.5 补丁
 
 窗口 6（NPC）依赖 4
-窗口 7（特效音频）可与 6 并行
+窗口 7（特效音频 + 商店）✅ 已完成 — 含 §1.3.19
 窗口 8（UI）依赖 4、5、6
 窗口 9（场景串联）依赖 8
 窗口 10（存档）依赖 9
@@ -910,6 +916,166 @@ data/
 | 调试默认 | `config.DEBUG_MODE=False`，F3 手动开启 |
 | 对话日志 | 10 处关键路径 logger，`__debug_dialogue.py` 写入 `__dialogue_log.txt` |
 
+### 1.3.19 第 11 阶段实施摘要（粒子特效与音频 + 商店系统 + 大量修复）
+
+> 实施过程：6 轮对话，创建 11 个文件，深度改造 12 个文件。冒烟测试 10/10（粒子+音频）、11/11（商店）。
+
+#### 11.0 新建文件清单
+
+| # | 文件 | 说明 |
+|---|------|------|
+| 1 | `animation/__init__.py` | 动画模块统一导出 |
+| 2 | `animation/animation_clip.py` | `AnimationClip` — 帧序列+帧率+循环，含占位图形自动生成 |
+| 3 | `animation/sprite_sheet_loader.py` | `SpriteSheetLoader` — 精灵表行列切割 + LRU 缓存 + `replace_sheet` 热重载接口 |
+| 4 | `animation/animation_state_machine.py` | `AnimationStateMachine` — 状态→动画片段映射，与实体 FSM 联动 |
+| 5 | `animation/animator.py` | `Animator` — 动画控制器顶层外观，含 `render(x,y)` 一次性绘制 |
+| 6 | `animation/particle_system.py` | **核心** — `Particle` / `ParticleEmitter` / `PresetEmitters`(10种) / `ParticleManager` |
+| 7 | `audio/__init__.py` | 音频模块统一导出 |
+| 8 | `audio/sfx_player.py` | `SFXPlayer` — 6 种占位音效（程序生成方波/噪声/扫频）+ 事件订阅 |
+| 9 | `audio/bgm_player.py` | `BGMPlayer` — 淡入淡出 + 区域映射 + 静默兜底 |
+| 10 | `audio/audio_manager.py` | `AudioManager` — 统一入口，封装 SFX + BGM |
+| 11 | `ui/shop_screen.py` | `ShopScreen` — 商店 UI 覆盖层（4 分类/50 件商品/WASD+Enter 操作） |
+| 12 | `data/items/shop_merchant.json` | 商人莉亚商品表（消耗品/武器/护甲/材料 4 分类，含定价） |
+
+#### 11.1 粒子特效系统
+
+**10 种预设发射器**：
+| 预设 | 触发事件 | 粒子效果 | 类型 |
+|------|----------|----------|------|
+| `blood_splash` | `player_hurt` | 红色圆向两侧飞溅，受重力下落 | 一次性 |
+| `parry_flash` | `player_parry` | 金色大光圈屏幕空间扩散 | 屏幕空间 |
+| `poison` | `status_applied:poison` | 绿色气泡挂在实体连续上升 | 持续（依附实体） |
+| `burn` | `status_applied:burn` | 橙红火焰挂在实体连续冒起 | 持续（依附实体） |
+| `freeze` | `status_applied:freeze` | 蓝白冰晶方块挂在实体 | 持续（依附实体） |
+| `bleed` | `status_applied:bleed` | 深红血滴挂在实体向下滴 | 持续（依附实体） |
+| `dust` | `player_dodge` / `player_block_hit` | 灰棕色圆形扩散 | 一次性 |
+| `magic` | `weapon_art_used` | 紫色闪烁星点扩散 | 一次性 |
+| `embers` | — | 火星粒子（营火等场景） | 一次性 |
+| `phase_burst` | — | Boss 转阶段爆裂光效 | 一次性 |
+
+**纹理替换接口**：
+```python
+emitter.particle_texture = loaded_sprite  # ParticleEmitter 级别
+particle.texture = my_surface             # 单颗粒子级别
+```
+
+**集成**：`GameScene` / `BossScene` 各持有 `ParticleManager`，在 `update()`/`render()` 中调用，事件处理器自动触发对应粒子。
+
+#### 11.2 音频系统
+
+**SFXPlayer**：6 种程序生成占位音效（方波/噪声/扫频）→ 订阅事件自动播放。替换接口：`sfx_player.replace_sound(name, filepath)`
+
+**BGMPlayer**：`pygame.mixer.music` 封装，淡入淡出 1.5s，区域 ID→BGM 映射。无音频文件时静默运行。
+
+**事件→音效映射**：`player_hurt→hit_flesh` / `player_parry→parry_clang` / `player_dodge→dodge_woosh` / `weapon_art_used→magic_cast`
+
+#### 11.3 商店系统
+
+**分类与商品**：消耗品 16 件 / 武器 17 件 / 护甲 12 件 / 材料 5 件，共 50 件商品，从 JSON 加载。
+
+**操作**：W/S 选择 / Q/E 切换分类 / Enter 购买 / ESC 离开。商店打开时暂停游戏逻辑。
+
+**购买逻辑**：检查灵魂是否足够 + 是否已达最大堆叠 → 扣灵魂 + 加物品 + 刷新 HUD。
+
+#### 11.4 武器属性数据驱动（17 把武器全量 JSON 注入）
+
+**根因**：所有 8 个武器类（Sword/Dagger/Greatsword/Spear/Axe/Bow/Staff/HolyTome）的元素和状态积累值全部硬编码，JSON 数据中 `element/bleed_stack/poison_stack` 未被使用。
+
+**修复** (`weapons/base_weapon.py` + `items/item_database.py`)：
+- `BaseWeapon.configure()` 新增方法，接收 `element/bleed_stack/poison_stack/light_dmg/heavy_dmg` 等动态注入
+- `ItemDatabase._register_weapons()` 从 8 个 JSON 文件加载全部 17 把武器，创建实例后调用 `configure()` 注入属性
+- 原有 4 把硬编码默认武器（`sword_iron/greatsword_iron/dagger_bone/holy_tome_basic`）已自动被 JSON 加载覆盖
+
+#### 11.5 远程武器抛射物修复（弓/法杖）
+
+**根因**：`_AttackBaseState` 对所有武器一视同仁创建近战 hitbox，弓和法杖不生成抛射物。
+
+**修复** (`entities/player/player_states.py`)：
+- `on_enter()` 中新增 `_should_fire_projectile(weapon)` 判断 → 弓/法杖跳过 hitbox 创建
+- `_fire_projectile()` → 直接创建 `Arrow/MagicBall` 并 `area.projectiles.append()`
+- `_update_projectiles()` 正常推进命中检测 + 渲染
+
+**Arrow 出生自毁修复** (`physics/projectile.py`)：
+- 首帧 0.1s 豁免环境碰撞检测，避免贴墙时立即销毁
+- 箭矢渲染尺寸 14×4 像素棕色矩形（与敌人弓手 Arrow 完全一致）
+
+**PoisonEffect 累积机制** (`combat/status_effect.py`)：
+- 新增 `add_stack()` 方法和 THRESHOLD=80 积累阈值
+- 未达阈值时仅衰减积累值，不扣血；达到后开始每秒扣血
+
+#### 11.6 状态异常粒子清理修复
+
+**根因**：敌人死亡后 `enemy_ai.py` DeadState 未发射 `status_removed` 事件，粒子系统无法清理挂载的持续发射器。
+
+**修复** (`entities/enemy/enemy_ai.py`)：死亡时遍历 `poison/burn/freeze/bleed` → `status.clear()` + 发射事件。
+
+同理修复 (`entities/player/player_combat.py` + `systems/respawn_system.py`)：玩家死亡/复活时清理。
+
+#### 11.7 DOT 伤害致死修复
+
+**根因**：`PoisonEffect.update()` / `BurnEffect.update()` 直接调用 `owner.stats.take_damage()` 扣 HP，不经过实体级 `take_damage()` 入口，死亡流程（HP≤0→Dead→enemy_dead）不触发。
+
+**修复**：DOT 伤害改为 `owner.take_damage(dmg)`。
+
+#### 11.8 元素武器附加效果
+
+**修复** (`combat/hit_resolver.py` + `physics/projectile.py`)：
+- `fire` 元素命中 → 附加 `BurnEffect(8s)`
+- `ice` 元素命中 → 附加 `FreezeEffect(2s)`
+- `poison` 元素命中 → 累积 `PoisonEffect`（已有 `poison_stack`）
+- `bleed` 积累 → 已有 `bleed_stack`
+
+#### 11.9 传送保留装备/灵魂修复
+
+**根因**：`_do_teleport()` 调用 `scene_manager.replace(GameScene(...))` 创建全新 Player，丢失所有状态。
+
+**修复** (`scenes/game_scene.py` + `ui/campfire_menu.py`)：
+- `GameScene.__init__` 新增 `_existing_player` 参数，`on_enter()` 复用已有玩家
+- `_do_teleport()` 传入 `_existing_player=self._player`
+
+#### 11.10 Boss 场景返回后 current_area 修复
+
+**根因**：从 BossScene pop 后 `player.current_area` 仍指向 `boss_duke`，弓箭矢写入错误区域。
+
+**修复** (`scenes/game_scene.py`)：`on_resume()` 强制 `player.current_area = self._area` + 恢复 BGM。
+
+#### 11.11 改造文件全览
+
+| 文件 | 变更 |
+|------|------|
+| `animation/` (6 个) | 新建 |
+| `audio/` (4 个) | 新建 |
+| `ui/shop_screen.py` | 新建 |
+| `data/items/shop_merchant.json` | 新建 |
+| `combat/status_effect.py` | PoisonEffect 积累阈值 + DOT 修复 + add_stack |
+| `combat/status_manager.py` | `add()` 发射 `status_applied`；`remove()` 发射 `status_removed` |
+| `combat/hit_resolver.py` | `poison_stack` 处理 + 元素附加（fire→burn, ice→freeze）|
+| `physics/projectile.py` | `on_hit` 状态积累 + Arrow 0.1s 豁免 + bleed_stack/poison_stack 属性 |
+| `weapons/base_weapon.py` | `configure()` 动态注入方法 |
+| `weapons/types/bow.py` | `_spawn_arrow` 返回 None 时退箭 + 日志 |
+| `weapons/types/staff.py` | `_spawn_magic_ball` 返回 None 时退灵力 |
+| `items/item_database.py` | `_register_weapons()` 从 8 个 JSON 加载 17 把武器并注入属性 |
+| `map/area.py` | + `bgm_id` 字段 |
+| `entities/player/player_states.py` | `_should_fire_projectile` + `_fire_projectile` + poison_stack 透传 |
+| `entities/player/player_combat.py` | 玩家死亡时清理粒子 + 事件 |
+| `entities/enemy/enemy_ai.py` | DeadState 清理状态 + 粒子事件 |
+| `systems/respawn_system.py` | 复活时清状态异常 |
+| `scenes/game_scene.py` | ParticleManager + AudioManager + ShopScreen + 6 粒子事件处理器 + 传送保留玩家 + on_resume 修复 |
+| `scenes/boss_scene.py` | 同上粒子+音频集成 |
+| `ui/campfire_menu.py` | `_do_teleport()` 传送现有玩家 |
+| `config.py` | 已有 `LAYER_PARTICLE=35` |
+
+#### 11.12 测试覆盖
+
+| 脚本 | 覆盖项 | 结果 |
+|------|--------|------|
+| `_test_stage11_particles_audio.py` | Particle 创建/更新/渲染，8 种预设发射，依附/屏幕空间，动画系统导入，6 种音效生成，BGM 静默，AudioManager，StatusManager 事件，HitResolver 连接，GameScene/BossScene 集成 | **10/10** |
+| `_test_stage11_shop.py` | JSON 加载，ShopScreen 导入/开闭/导航，购买消耗品/武器/护甲，灵魂不足/上限拒绝，ESC 关闭，GameScene 集成 | **11/11** |
+| `_test_stage8_regression.py` | 24 项回归 | **零破坏** |
+| `_test_stage9_boss.py` | 11 组 Boss 测试 | **零破坏** |
+
+
+
 ---
 
 ## 五、提示词使用示范
@@ -923,7 +1089,7 @@ data/
 游戏设计案：game_rule.md
 开发工作流：DEV_WORKFLOW.md（请先阅读 §1 了解当前进度与设计约定）
 
-【已完成】第 1~10 阶段（工程基础 → NPC 对话系统，全部完成）
+【已完成】第 1~11 阶段（工程基础 → 粒子特效+音频+商店，全部完成）
 
 【本次任务】第 11 阶段：粒子特效与音频
 

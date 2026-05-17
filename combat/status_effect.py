@@ -147,30 +147,49 @@ class BleedEffect(StatusEffect):
 # ============================================================
 
 class PoisonEffect(StatusEffect):
-    """中毒：持续 30s，每秒扣固定伤害。"""
+    """中毒：持续 30s，每秒扣固定伤害。支持积累阈值。"""
 
     name  = "poison"
     color = (80, 200, 80)
 
     # 默认值，会被 _BALANCE["poison"] 覆盖
-    DAMAGE_PER_SEC = 3.0
+    DAMAGE_PER_SEC   = 3.0
     DEFAULT_DURATION = 30.0
+    THRESHOLD        = 80.0       # 积累阈值，达到后才生效
 
     def __init__(self, damage_per_sec: float = DAMAGE_PER_SEC,
                  duration: float = DEFAULT_DURATION):
         super().__init__(duration=duration)
         self.damage_per_sec = damage_per_sec
+        self.accumulation: float = 0.0
         self._tick_timer: float = 0.0
+        self._triggered: bool = False   # 是否已达到阈值开始生效
+
+    def add_stack(self, amount: float) -> None:
+        """积累中毒值。"""
+        self.accumulation += amount
 
     def update(self, dt: float, owner) -> bool:
-        # 子类完整重写 update，不调用 super()，需手动维护 elapsed
         self.elapsed += dt
+
+        # 未达到阈值：仅衰减积累值，不扣血
+        if not self._triggered:
+            self.accumulation = max(0.0, self.accumulation - 3.0 * dt)
+            if self.accumulation >= self.THRESHOLD:
+                self._triggered = True
+            return True
+
         self._tick_timer += dt
         if self._tick_timer >= 1.0:
             self._tick_timer -= 1.0
             dmg = max(1, int(self.damage_per_sec))
-            if hasattr(owner, "stats") and hasattr(owner.stats, "take_damage"):
-                owner.stats.take_damage(dmg)
+            # 第 11 阶段：通过 owner.take_damage（而非 stats.take_damage）确保死亡流程触发
+            if hasattr(owner, "take_damage"):
+                try:
+                    owner.take_damage(dmg)
+                except Exception:
+                    if hasattr(owner, "stats") and hasattr(owner.stats, "take_damage"):
+                        owner.stats.take_damage(dmg)
             if hasattr(owner, "_on_dot_damage"):
                 owner._on_dot_damage(dmg, "poison")
         return not self.expired
@@ -228,8 +247,12 @@ class BurnEffect(StatusEffect):
         if self._tick_timer >= 1.0:
             self._tick_timer -= 1.0
             dmg = max(1, int(self.damage_per_sec))
-            if hasattr(owner, "stats") and hasattr(owner.stats, "take_damage"):
-                owner.stats.take_damage(dmg)
+            if hasattr(owner, "take_damage"):
+                try:
+                    owner.take_damage(dmg)
+                except Exception:
+                    if hasattr(owner, "stats") and hasattr(owner.stats, "take_damage"):
+                        owner.stats.take_damage(dmg)
             if hasattr(owner, "_on_dot_damage"):
                 owner._on_dot_damage(dmg, "burn")
         return not self.expired

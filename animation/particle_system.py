@@ -758,7 +758,11 @@ class ParticleManager:
         :param preset_name: 预设名称
         :param entity:      实体
         """
+        import logging
+        _log = logging.getLogger(__name__)
         key = (preset_name, id(entity))
+        _log.debug("ParticleManager.remove_attached: key=%s found=%s",
+                   key, key in self._attached)
         if key in self._attached:
             self._attached[key].clear()
             del self._attached[key]

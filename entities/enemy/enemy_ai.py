@@ -374,6 +374,14 @@ class EnemyDeadState(State):
             e.dead   = True
             e.active = False
             self._emitted = True
+            # 第 11 阶段：清理敌人身上挂载的状态和粒子特效
+            if hasattr(e, "status"):
+                for name in ("poison", "burn", "freeze", "bleed"):
+                    if e.status.has(name):
+                        event_manager.emit("status_removed", {
+                            "entity": e, "status": name,
+                        })
+                e.status.clear()
             event_manager.emit("enemy_dead", {"enemy": e})
 
 

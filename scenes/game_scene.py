@@ -19,6 +19,7 @@ from ui.death_screen      import DeathScreen
 from ui.campfire_menu     import CampfireMenu
 from ui.dialogue_box      import DialogueBox
 from core.dialogue_engine import DialogueEngine
+from ui.shop_screen       import ShopScreen
 from utils.color        import UI_HIGHLIGHT
 from config             import SCREEN_WIDTH, SCREEN_HEIGHT
 import utils.debug as debug
@@ -47,9 +48,15 @@ class GameScene(BaseScene):
     - 摄像机跟随
     """
 
-    def __init__(self, area_id: str = "area_graveyard", restart: bool = False):
+    def __init__(self, area_id: str = "area_graveyard", restart: bool = False,
+                 *, _teleport_x: float = None, _teleport_y: float = None,
+                 _existing_player = None):
         self._area_id  = area_id
         self._restart  = restart          # True = 重新开始，需要重载区域动态对象
+        self._teleport_spawn = None       # 传送目标坐标 (x, y)，若设则忽略默认出生点
+        if _teleport_x is not None and _teleport_y is not None:
+            self._teleport_spawn = (_teleport_x, _teleport_y)
+        self._existing_player = _existing_player  # 传送时保留的玩家引用
         self._area     = None
         self._camera   = Camera()
         self._player: Player | None = None
@@ -88,6 +95,9 @@ class GameScene(BaseScene):
         # 对话暂停标记
         self._dialogue_paused: bool = False
 
+        # ---- 第 11 阶段扩展·商店界面 ----
+        self._shop_screen = ShopScreen()
+
     def on_enter(self):
         pygame.font.init()
         self._hint_font = get_font(18)
@@ -100,8 +110,18 @@ class GameScene(BaseScene):
         else:
             self._area = world_map.enter_area(self._area_id)
 
-        spawn_x, spawn_y = self._area.get_spawn_point()
-        self._player = Player(spawn_x, spawn_y)
+        # 传送坐标优先于默认出生点
+        if self._teleport_spawn:
+            spawn_x, spawn_y = self._teleport_spawn
+        else:
+            spawn_x, spawn_y = self._area.get_spawn_point()
+
+        # 传送时复用已有玩家，仅重新定位；否则创建新玩家
+        if self._existing_player is not None:
+            self._player = self._existing_player
+            self._player.set_position(spawn_x, spawn_y)
+        else:
+            self._player = Player(spawn_x, spawn_y)
         # 让武器战技 / 特殊物品可访问 area.projectiles / dropped_items
         self._player.current_area = self._area
 
@@ -188,9 +208,15 @@ class GameScene(BaseScene):
         self._audio_mgr.stop_bgm(fade_ms=800)
 
     def on_resume(self):
-        """从 BossScene pop 后恢复：重置雾门触发标记，允许再次进入。"""
+        """从 BossScene pop 后恢复：重置雾门触发标记 + 修复 player.current_area。"""
         self._boss_triggered = False
         self._death_paused = False
+        # 第 11 阶段修复：BossScene pop 后 player.current_area 仍指向 boss_duke，
+        # 必须重新指向本场景的 area。同时 BGM 切回本区域。
+        if self._player is not None and self._area is not None:
+            self._player.current_area = self._area
+        bgm_id = getattr(self._area, "bgm_id", self._area_id)
+        self._audio_mgr.play_bgm(bgm_id)
 
     def _on_enemy_dead(self, data: dict) -> None:
         """
@@ -483,20 +509,21 @@ class GameScene(BaseScene):
             traceback.print_exc()
 
     def _on_npc_open_shop(self, data: dict) -> None:
-        """商人：打开商店（暂用浮字提示 + 关闭对话）。"""
+        """商人：打开商店界面。"""
         _log.info("NPC_EVENT open_shop player=%s", self._player is not None)
         try:
             if self._player is None:
                 return
-            self._floating_texts.add(
-                "商店功能开发中...",
-                self._player.rect.centerx, self._player.rect.top - 20,
-                color=(255, 220, 100), size=16, lifetime=2.0,
-            )
+            # 关闭对话
             self._dialogue_box.close()
             self._dialogue_paused = False
+            # 打开商店
+            self._shop_screen.open(self._player)
             _log.info("NPC_EVENT open_shop done")
         except Exception:
+            import traceback
+            _log.error("NPC_EVENT open_shop FAILED:\n%s", traceback.format_exc())
+            traceback.print_exc()
             import traceback
             _log.error("NPC_EVENT open_shop FAILED:\n%s", traceback.format_exc())
             traceback.print_exc()
@@ -517,23 +544,22 @@ class GameScene(BaseScene):
             return
 
         col = self._area.collision
+        enemies = self._area.enemies
 
-        # 玩家发射 → 命中目标候选 = 敌人；敌人发射 → 命中目标 = 玩家
-        # owner 为 self.player（含子类）的弹是玩家方
-        # 注意：projectile.update 内部已通过 owner != target 过滤
         for p in list(projs):
             if not p.alive:
                 continue
             owner = getattr(p, "owner", None)
-            if owner is self._player:
-                targets = self._area.enemies
+            # 玩家方抛射物（包括毒飞镖）：打敌人
+            is_player_projectile = (owner is self._player)
+            if is_player_projectile:
+                targets = enemies
             else:
-                # 默认认为是敌方弹，命中玩家
-                targets = [self._player]
+                targets = [self._player] if self._player else []
             p.update(dt, col, targets)
 
-        # 清理已死亡抛射物
-        self._area.projectiles = [p for p in projs if p.alive]
+        alive = [p for p in projs if p.alive]
+        self._area.projectiles = alive
 
     def handle_events(self, events: list):
         for event in events:
@@ -566,6 +592,11 @@ class GameScene(BaseScene):
             # ---- 对话框优先消耗事件（第 10 阶段）----
             if self._dialogue_box.is_open():
                 if self._dialogue_box.handle_event(event):
+                    continue
+
+            # ---- 商店界面优先消耗事件（第 11 阶段）----
+            if self._shop_screen.is_open:
+                if self._shop_screen.handle_event(event):
                     continue
 
             # ---- 背包界面优先消耗事件 ----
@@ -663,6 +694,11 @@ class GameScene(BaseScene):
         # ---- 对话进行中：暂停游戏逻辑（第 10 阶段）----
         if self._dialogue_paused:
             self._dialogue_box.update(dt)
+            return
+
+        # ---- 商店界面打开：暂停游戏逻辑（第 11 阶段）----
+        if self._shop_screen.is_open:
+            self._shop_screen.update(dt)
             return
 
         # ---- 背包/装备界面打开时暂停游戏逻辑 ----
@@ -854,6 +890,10 @@ class GameScene(BaseScene):
         if self._dialogue_box.is_open():
             self._dialogue_box.render(surface)
 
+        # 15. 商店界面（第 11 阶段扩展）
+        if self._shop_screen.is_open:
+            self._shop_screen.render(surface)
+
         pygame.display.flip()
 
     def _render_hints(self, surface: pygame.Surface):
@@ -955,6 +995,8 @@ class GameScene(BaseScene):
         }
         preset = status_particle_map.get(status_name)
         if preset:
+            _log.debug("_on_particle_status_removed: preset=%s entity=%s",
+                       preset, type(entity).__name__)
             self._particle_mgr.remove_attached(preset, entity)
 
     # ----------------------------------------------------------------

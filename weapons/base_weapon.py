@@ -293,6 +293,53 @@ class BaseWeapon:
 
     # ---- 元数据 ----
 
+    def configure(self,
+                  *, display_name: str = None,
+                  color: tuple = None,
+                  light_dmg: int = None,
+                  heavy_dmg: int = None,
+                  element: str = None,
+                  bleed_stack: float = None,
+                  poison_stack: float = None,
+                  light_stamina: float = None,
+                  heavy_stamina: float = None,
+                  light_knockback: float = None,
+                  heavy_knockback: float = None,
+                  light_combo_mult: tuple = None) -> "BaseWeapon":
+        """
+        第 11 阶段扩展：动态注入 JSON 武器属性。
+        覆盖子类的硬编码默认值，用于 ItemDatabase 注册时从武器 JSON 传入。
+
+        示例：
+            dagger_obj = Dagger()
+            dagger_obj.configure(element="poison", poison_stack=60)
+        """
+        if display_name is not None:
+            self.display_name = display_name
+        if color is not None:
+            self.color = tuple(color)
+        if light_dmg is not None:
+            self._base_light_dmg = int(light_dmg)
+        if heavy_dmg is not None:
+            self._base_heavy_dmg = int(heavy_dmg)
+        if element is not None:
+            self._element = str(element)
+        if bleed_stack is not None:
+            self._bleed_stack_light = float(bleed_stack)
+        if poison_stack is not None:
+            self._poison_stack_light = float(poison_stack)
+        if light_stamina is not None:
+            self._light_stamina = float(light_stamina)
+        if heavy_stamina is not None:
+            self._heavy_stamina = float(heavy_stamina)
+        if light_knockback is not None:
+            self._light_knockback = float(light_knockback)
+        if heavy_knockback is not None:
+            self._heavy_knockback = float(heavy_knockback)
+        if light_combo_mult is not None:
+            self._light_combo_mult = tuple(light_combo_mult)
+        return self
+
     @property
     def element(self) -> str:
         # 元素优先级：强化覆盖 > 类元素

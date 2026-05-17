@@ -168,6 +168,13 @@ class PlayerCombat:
         if p.stats.is_dead:
             # 死亡由 GameScene 的 update 循环统一处理（显示死亡界面等）
             # 此处不切换状态，仅发射事件
+            # 第 11 阶段：清理玩家身上挂载的粒子
+            if hasattr(p, "status"):
+                for name in ("poison", "burn", "freeze", "bleed"):
+                    if p.status.has(name):
+                        event_manager.emit("status_removed", {
+                            "entity": p, "status": name,
+                        })
             event_manager.emit("player_death", {"x": p.x, "y": p.y})
         elif actual > 0:
             p.fsm.change_state("Hurt")

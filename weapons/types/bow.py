@@ -62,7 +62,7 @@ def _spawn_arrow(player: "Player", area, *,
                  poise_damage: float = 8.0,
                  piercing: bool = False,
                  lifetime: float = 4.0):
-    """生成一支 Arrow 抛射物并加入 area.projectiles。"""
+    """生成一支 Arrow 抛射物并加入 area.projectiles。返回 arrow 或 None。"""
     from physics.projectile import Arrow
     facing = player.facing or 1
     vx = vx_base * facing
@@ -79,14 +79,15 @@ def _spawn_arrow(player: "Player", area, *,
         lifetime = lifetime,
     )
     if piercing:
-        # 穿透标记（命中后不销毁）
         try:
-            arrow.piercing = True   # type: ignore[attr-defined]
+            arrow.piercing = True
         except Exception:
             pass
     if area is not None and hasattr(area, "projectiles"):
         area.projectiles.append(arrow)
-    return arrow
+        return arrow
+    # area 无效 → 抛射物无法注册，返回 None
+    return None
 
 
 class BowPiercingArrowArt(WeaponArt):
@@ -187,13 +188,18 @@ class Bow(BaseWeapon):
     def fire_arrow(self, player: "Player", area, *, is_heavy: bool = False):
         """
         生成一支普通箭。
-        :param is_heavy: 重攻击 → 伤害更高、初速更快、有重力。
+        :param is_heavy: 重攻击 → 伤害更高、初速更快。
+        :return: Arrow 实例或 None（缺箭矢/area无效）。
         """
+        import logging
+        _log = logging.getLogger(__name__)
+
         if not _consume_arrow(player):
+            _log.debug("Bow.fire_arrow: 缺箭矢")
             return None
         if is_heavy:
             wd = self.get_heavy_attack()
-            return _spawn_arrow(
+            arrow = _spawn_arrow(
                 player, area,
                 vx_base=820.0,
                 damage=wd.damage,
@@ -203,7 +209,7 @@ class Bow(BaseWeapon):
             )
         else:
             wd = self.get_light_attack(0)
-            return _spawn_arrow(
+            arrow = _spawn_arrow(
                 player, area,
                 vx_base=700.0,
                 damage=wd.damage,
@@ -211,3 +217,19 @@ class Bow(BaseWeapon):
                 poise_damage=wd.poise_damage,
                 lifetime=4.0,
             )
+        # 若 area 无效导致箭矢未加入 projectiles，退箭
+        if arrow is None:
+            inv = getattr(player, "inventory", None)
+            if inv is not None:
+                from items.item_database import item_db
+                proto = item_db.get(ARROW_ITEM_ID)
+                if proto is not None:
+                    inv.add(proto, 1)
+            event_manager.emit("weapon_no_ammo", {
+                "weapon_type": "bow", "ammo_id": ARROW_ITEM_ID,
+            })
+            _log.debug("Bow.fire_arrow: _spawn_arrow 返回 None（area无效）")
+            return None
+        _log.debug("Bow.fire_arrow: 成功发射 arrow=%s area_projectiles=%d",
+                   arrow, len(getattr(area, "projectiles", [])))
+        return arrow
