@@ -334,7 +334,7 @@ class Player(BaseEntity):
 
     # 装备槽（slot, item_id）
     _STARTING_EQUIPMENT = [
-        ("weapon", "sword_iron"),     # 主武器：铁制骑士剑
+        ("weapon", "knight_sword"),   # 主武器：骑士剑
         ("head",   "ranger_hood"),    # 游侠风帽（轻甲，保留快速翻滚）
         ("chest",  "ranger_vest"),
         ("hands",  "ranger_gloves"),
@@ -371,7 +371,7 @@ class Player(BaseEntity):
 
         # ---- 3. 派发事件，让 UI 层显示"初始装备已发放" ----
         event_manager.emit("player_starting_kit_granted", {
-            "weapon":     "sword_iron",
+            "weapon":     "knight_sword",
             "armor_set":  "ranger",
             "potion_count": sum(q for iid, q in self._STARTING_INVENTORY
                                 if iid.startswith("heal_") or iid.startswith("mana_")

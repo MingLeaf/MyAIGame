@@ -1,0 +1,35 @@
+pygame 2.6.1 (SDL 2.28.4, Python 3.8.2)
+Hello from the pygame community. https://www.pygame.org/contribute.html
+============================================================
+第 8 阶段回归验证
+============================================================
+  ✓ core.game
+  ✓ core.event_manager
+  ✓ core.input_handler
+  ✓ combat.damage_calculator
+  ✓ combat.status_effects
+  ✓ combat.drop_system
+  ✓ combat.parry_system
+  ✓ weapons.base_weapon
+  ✓ weapons.sword
+  ✓ weapons.weapon_upgrade
+  ✓ items.item_database
+  ✓ items.item_manager
+  ✓ entities.base_entity
+  ✓ entities.player.player
+  ✓ entities.enemy.base_enemy
+  ✓ map.area
+  ✓ map.world_map
+  ✓ map.campfire
+  ✓ scenes.game_scene
+  ✓ systems (all)
+  ✓ Player.__init__
+  ✓ Player.soul_fragments = 0
+  ✓ Sword 创建
+  ✓ Sword upgrade_level = 0
+  ✓ item_db 加载
+  ✓ item_db 已加载 60 个物品
+
+============================================================
+  ✅ 所有回归测试通过！第 8 阶段零破坏。
+============================================================

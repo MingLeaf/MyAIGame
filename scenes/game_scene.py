@@ -20,6 +20,8 @@ from ui.campfire_menu     import CampfireMenu
 from ui.dialogue_box      import DialogueBox
 from core.dialogue_engine import DialogueEngine
 from ui.shop_screen       import ShopScreen
+from ui.notification      import NotificationManager
+from ui.status_panel      import StatusPanel
 from utils.color        import UI_HIGHLIGHT
 from config             import SCREEN_WIDTH, SCREEN_HEIGHT
 import utils.debug as debug
@@ -38,6 +40,26 @@ from systems.quest_system         import QuestSystem
 # 第 11 阶段：粒子特效与音频
 from animation.particle_system import ParticleManager
 from audio.audio_manager import AudioManager
+
+
+# Q 键快速使用消耗品优先级（从高到低）
+_QUICK_USE_PRIORITY = [
+    "heal_potion_small",    # 草药汤
+    "heal_potion_large",    # 高级圣水
+    "mana_potion_basic",    # 灵力药剂
+    "antidote_universal",   # 万能解药
+    "stamina_potion_basic", # 精力饮剂
+    "buff_sharp_powder",    # 锋刃石粉
+    "buff_iron_skin",       # 铁皮膏
+    "buff_holy_oil",        # 圣油
+    "buff_flame_resin",     # 烈焰松脂
+    "buff_berserk",         # 狂战药
+    "curse_remover_charm",  # 诅咒解符
+    "skeleton_ashes",       # 骷髅骨灰
+    "teleport_stone",       # 传送石
+    "trap_bomb",            # 陷阱炸弹
+    "poison_dart",          # 毒飞镖
+]
 
 
 class GameScene(BaseScene):
@@ -98,6 +120,12 @@ class GameScene(BaseScene):
         # ---- 第 11 阶段扩展·商店界面 ----
         self._shop_screen = ShopScreen()
 
+        # ---- 第 12 阶段·通知系统 ----
+        self._notifications = NotificationManager()
+
+        # ---- 第 12 阶段·人物属性面板（Tab 键）----
+        self._status_panel = StatusPanel()
+
     def on_enter(self):
         pygame.font.init()
         self._hint_font = get_font(18)
@@ -153,6 +181,10 @@ class GameScene(BaseScene):
         event_manager.subscribe("summon_ally",           self._on_summon_ally)
         event_manager.subscribe("player_buff_applied",   self._on_player_buff)
 
+        # ---- 第 12 阶段修复：传送石 + 陷阱炸弹事件 ----
+        event_manager.subscribe("teleport_to_campfire", self._on_teleport_to_campfire)
+        event_manager.subscribe("place_trap",           self._on_place_trap)
+
         # ---- 第 10 阶段·NPC 事件 ----
         event_manager.subscribe("npc_open_level_up",       self._on_npc_open_level_up)
         event_manager.subscribe("npc_open_teleport",       self._on_npc_open_teleport)
@@ -177,6 +209,10 @@ class GameScene(BaseScene):
 
         self._loaded = True
 
+        # ---- 第 12 阶段：区域名称提示 ----
+        area_name = getattr(self._area, "area_name", self._area_id)
+        self._notifications.show_area(area_name)
+
     def on_exit(self):
         """场景退出时取消事件订阅，防止悬空引用。"""
         event_manager.unsubscribe("enemy_dead",            self._on_enemy_dead)
@@ -190,6 +226,8 @@ class GameScene(BaseScene):
         event_manager.unsubscribe("consumables_refilled",   self._on_consumables_refilled)
         event_manager.unsubscribe("summon_ally",            self._on_summon_ally)
         event_manager.unsubscribe("player_buff_applied",    self._on_player_buff)
+        event_manager.unsubscribe("teleport_to_campfire",    self._on_teleport_to_campfire)
+        event_manager.unsubscribe("place_trap",              self._on_place_trap)
         event_manager.unsubscribe("npc_open_level_up",      self._on_npc_open_level_up)
         event_manager.unsubscribe("npc_open_teleport",      self._on_npc_open_teleport)
         event_manager.unsubscribe("npc_open_weapon_upgrade", self._on_npc_open_weapon_upgrade)
@@ -283,6 +321,8 @@ class GameScene(BaseScene):
             size=15,
             lifetime=1.8,
         )
+        # 第 12 阶段：右下角拾取通知
+        self._notifications.show_item_pickup(f"获得 {name}×{qty}")
 
     def _on_set_bonus_activated(self, data: dict) -> None:
         """套装效果激活 → 金色飘字 + 头顶提示。"""
@@ -456,6 +496,110 @@ class GameScene(BaseScene):
         )
 
     # ----------------------------------------------------------------
+    # 第 12 阶段修复 · 传送石 → 传送回最近营地
+    # ----------------------------------------------------------------
+
+    def _on_teleport_to_campfire(self, data: dict) -> None:
+        """传送石效果：传送回最近激活的营地。"""
+        from systems.campfire_system import CampfireSystem
+        last = CampfireSystem.get_last_campfire()
+        if last is None:
+            self._floating_texts.add(
+                "无可用营地", self._player.rect.centerx, self._player.rect.centery,
+                color=(255, 150, 60), size=16, lifetime=2.0,
+            )
+            return
+        pos = CampfireSystem.get_position(last)
+        if pos is None or self._player is None:
+            return
+        # 传送玩家到营地坐标
+        self._player.set_position(pos["x"], pos["y"])
+        self._camera.center_on(pos["x"], pos["y"])
+        self._floating_texts.add(
+            "● 传送成功 ●",
+            pos["x"], pos["y"] - 48,
+            color=(120, 220, 255),
+            size=18,
+            lifetime=2.0,
+        )
+        event_manager.emit("player_teleported", {
+            "campfire_id": last,
+            "x": pos["x"], "y": pos["y"],
+        })
+
+    # ----------------------------------------------------------------
+    # 第 12 阶段修复 · 陷阱炸弹 → 放置定时炸弹
+    # ----------------------------------------------------------------
+
+    def _on_place_trap(self, data: dict) -> None:
+        """陷阱炸弹效果：在玩家脚下放置一颗定时爆炸的炸弹。"""
+        trap_x = float(data.get("x", 0))
+        trap_y = float(data.get("y", 0))
+        damage = int(data.get("damage", 80))
+
+        from physics.projectile import Projectile
+
+        # 使用 Projectile 做陷阱：速度 0，靠碰撞检测触发
+        bomb = Projectile(
+            x=trap_x, y=trap_y - 24,
+            vx=0, vy=0,
+            damage=damage,
+            owner=self._player,
+            element="fire",
+            poise_damage=30.0,
+            lifetime=10.0,      # 10 秒后自毁
+            width=32,
+            height=32,
+            knockback=250.0,
+        )
+        bomb.color = (255, 100, 20)  # 橙红色，区别于普通抛射物
+        if hasattr(self._area, "projectiles"):
+            self._area.projectiles.append(bomb)
+
+        self._floating_texts.add(
+            "● 陷阱已放置 ●",
+            trap_x, trap_y - 36,
+            color=(255, 160, 40),
+            size=15,
+            lifetime=1.5,
+        )
+
+        # 粒子效果
+        self._particle_mgr.spawn("fire_embers", position=(trap_x, trap_y - 24))
+
+    # ----------------------------------------------------------------
+    # 第 12 阶段修复 · Q 键快速使用消耗品
+    # ----------------------------------------------------------------
+
+    def _quick_use_item(self) -> None:
+        """快速使用背包中的第一个消耗品（优先顺序见 _QUICK_USE_PRIORITY）。"""
+        if self._player is None:
+            return
+        inv = self._player.inventory
+        if inv is None:
+            return
+
+        # 查找可用的消耗品
+        for item_id in _QUICK_USE_PRIORITY:
+            for i, slot in enumerate(inv.slots):
+                if slot is None or slot.item is None:
+                    continue
+                if getattr(slot.item, "item_id", "") == item_id:
+                    ok = inv.use_item(i, self._player)
+                    if ok:
+                        name = getattr(slot.item, "name", item_id)
+                        self._floating_texts.add(
+                            f"使用 {name}",
+                            self._player.rect.centerx,
+                            self._player.rect.top - 10,
+                            color=(200, 220, 255),
+                            size=14,
+                            lifetime=1.5,
+                        )
+                        self._notifications.show(f"使用 {name}")
+                    return
+
+    # ----------------------------------------------------------------
     # 第 10 阶段·NPC 对话事件处理
     # ----------------------------------------------------------------
 
@@ -599,6 +743,11 @@ class GameScene(BaseScene):
                 if self._shop_screen.handle_event(event):
                     continue
 
+            # ---- 人物属性面板优先消耗事件（第 12 阶段·Tab 键）----
+            if self._status_panel.is_open:
+                if self._status_panel.handle_event(event):
+                    continue
+
             # ---- 背包界面优先消耗事件 ----
             if self._inv_screen.is_open:
                 if self._inv_screen.handle_event(event):
@@ -673,9 +822,19 @@ class GameScene(BaseScene):
                     self._equip_screen.toggle(self._player)
                     if self._equip_screen.is_open:
                         self._inv_screen.close()
+                        self._status_panel.close()
+                # Tab 键：人物属性面板（第 12 阶段）
+                if event.key == pygame.K_TAB and self._player:
+                    self._status_panel.toggle(self._player)
+                    if self._status_panel.is_open:
+                        self._inv_screen.close()
+                        self._equip_screen.close()
                 # 调试：T 键测试受击
                 if event.key == pygame.K_t and self._player:
                     self._player.take_damage(15, knockback_dir=-1)
+                # Q 键：快速使用消耗品（第 12 阶段修复）
+                if event.key == pygame.K_q and self._player and not self._inv_screen.is_open:
+                    self._quick_use_item()
 
     def update(self, dt: float):
         if not self._loaded or not self._player:
@@ -703,6 +862,11 @@ class GameScene(BaseScene):
 
         # ---- 背包/装备界面打开时暂停游戏逻辑 ----
         if self._inv_screen.is_open or self._equip_screen.is_open:
+            return
+
+        # ---- 属性面板打开时暂停游戏逻辑 ----
+        if self._status_panel.is_open:
+            self._status_panel.update(dt)
             return
 
         self._player.update(dt, self._area.collision)
@@ -806,6 +970,9 @@ class GameScene(BaseScene):
 
         self._floating_texts.update(dt)
 
+        # ---- 第 12 阶段：通知系统更新 ----
+        self._notifications.update(dt)
+
         # ---- 第 11 阶段：粒子特效更新 ----
         self._particle_mgr.update(dt)
 
@@ -869,6 +1036,9 @@ class GameScene(BaseScene):
         # 8. 伤害飘字（覆盖在 HUD 之上）
         self._floating_texts.render(surface, cam_offset)
 
+        # 8.5 通知系统（第 12 阶段：区域名/Boss/拾取提示）
+        self._notifications.render(surface)
+
         # 9. 操作提示（底部）
         self._render_hints(surface)
 
@@ -877,6 +1047,10 @@ class GameScene(BaseScene):
 
         # 11. 装备界面（覆盖层）
         self._equip_screen.render(surface)
+
+        # 11.5 人物属性面板（第 12 阶段）
+        if self._status_panel.is_open:
+            self._status_panel.render(surface)
 
         # 12. 死亡界面（最高覆盖层，第 8.1 阶段）
         if self._death_screen.visible:
@@ -900,7 +1074,7 @@ class GameScene(BaseScene):
         hints = [
             "A/D: 移动    Space: 跳跃    S+Space: 下穿平台",
             "Shift: 翻滚    J: 轻攻击    K: 重攻击    L: 格挡/弹反    U: 战技",
-            "F: 篝火/NPC    I: 背包    C: 装备    T: 受击测试    F3: 调试    ESC: 暂停",
+            "Q: 使用道具    F: 篝火/NPC    I: 背包    C: 装备    Tab: 属性    T: 受击    F3: 调试    ESC: 暂停",
         ]
         font = self._hint_font
         # 右上角，从上往下排，留 12px 右边距和顶边距

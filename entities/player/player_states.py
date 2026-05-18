@@ -321,7 +321,7 @@ class _AttackBaseState(PlayerState):
 
         # 时序从兜底数据中继承（武器只覆盖伤害/范围/元素）
         fb = self._data_fallback
-        return {
+        data = {
             "damage":  wd.damage,
             "stamina": wd.stamina_cost,
             "w":       wd.hb_width,
@@ -339,12 +339,28 @@ class _AttackBaseState(PlayerState):
             "poison_stack": wd.poison_stack,
         }
 
+        # ---- 第 12 阶段修复：武器附魔 Buff 覆盖元素 ----
+        if p is not None:
+            stats = getattr(p, "stats", None)
+            if stats is not None:
+                override = stats.get_weapon_element_override()
+                if override:
+                    data["element"] = override
+
+        return data
+
     @staticmethod
-    def _should_fire_projectile(weapon) -> bool:
-        """判断武器是否为远程（攻击时生成抛射物而非近战 hitbox）。"""
+    def _should_fire_projectile(weapon, is_heavy: bool = False) -> bool:
+        """判断武器是否为远程（攻击时生成抛射物而非近战 hitbox）。
+        弓：轻/重攻击均发射；法杖：仅重攻击发射魔法弹，轻攻击为近战拍击。
+        """
         from weapons.base_weapon import WeaponType
         wt = getattr(weapon, "weapon_type", "")
-        return wt in (WeaponType.BOW, WeaponType.STAFF)
+        if wt == WeaponType.BOW:
+            return True
+        if wt == WeaponType.STAFF:
+            return is_heavy
+        return False
 
     def _fire_projectile(self, weapon, p: "Player", data: dict) -> None:
         """发射远程抛射物（弓/法杖）——复用与敌人弓箭手 AI 完全相同的逻辑。"""
@@ -368,6 +384,11 @@ class _AttackBaseState(PlayerState):
             if not _consume_arrow(p):
                 return
             wd = weapon.get_light_attack(0) if not self._is_heavy else weapon.get_heavy_attack()
+            # 武器附魔 Buff 覆盖元素
+            arrow_element = wd.element
+            ov = p.stats.get_weapon_element_override()
+            if ov:
+                arrow_element = ov
             spawn_x = p.rect.centerx + facing * 14
             spawn_y = p.rect.centery - 4
             arrow = Arrow(
@@ -376,7 +397,7 @@ class _AttackBaseState(PlayerState):
                 vy=-40.0,
                 damage=wd.damage,
                 owner=p,
-                element=wd.element,
+                element=arrow_element,
                 poise_damage=wd.poise_damage,
                 lifetime=2.0,
             )
@@ -386,7 +407,18 @@ class _AttackBaseState(PlayerState):
                        len(area.projectiles))
 
         elif wt == WeaponType.STAFF:
+            # 法杖重攻击：消耗灵力发射魔法弹
+            HEAVY_MANA_COST = getattr(weapon, "HEAVY_MANA_COST", 8)
+            if not p.stats.consume_mana(HEAVY_MANA_COST):
+                _log.debug("_fire_projectile STAFF: mana 不足 (need=%d, have=%d)",
+                          HEAVY_MANA_COST, p.stats.mana)
+                return
             wd = weapon.get_heavy_attack()
+            # 武器附魔 Buff 覆盖元素
+            ball_element = wd.element
+            ov = p.stats.get_weapon_element_override()
+            if ov:
+                ball_element = ov
             ball = MagicBall(
                 x=p.rect.centerx + facing * 18,
                 y=p.rect.centery - 4,
@@ -394,7 +426,7 @@ class _AttackBaseState(PlayerState):
                 vy=0.0,
                 damage=wd.damage,
                 owner=p,
-                element=wd.element,
+                element=ball_element,
                 poise_damage=wd.poise_damage,
                 lifetime=2.5,
             )
@@ -414,7 +446,7 @@ class _AttackBaseState(PlayerState):
 
         # ---- 远程武器：在 on_enter 时生成抛射物，不再创建 hitbox ----
         weapon = getattr(p, "weapon", None)
-        if weapon is not None and self._should_fire_projectile(weapon):
+        if weapon is not None and self._should_fire_projectile(weapon, self._is_heavy):
             self._fire_projectile(weapon, p, data)
             # 标记本轮攻击已发射，update 中不再生成 hitbox
             self._projectile_fired = True

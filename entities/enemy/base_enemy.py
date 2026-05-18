@@ -102,6 +102,9 @@ class BaseEnemy(BaseEntity):
         self.frozen:  bool = False
         self.stunned: bool = False
 
+        # 记录上一帧的眩晕状态，用于检测眩晕结束（韧性回满）
+        self._was_stunned: bool = False
+
         # 状态异常管理器（FloatingTextManager 在 game_scene 里 bind）
         self.status: StatusManager = StatusManager(owner=self)
 
@@ -270,6 +273,12 @@ class BaseEnemy(BaseEntity):
         # 韧性恢复（委托给 EnemyStats.update_poise_regen）
         is_idle = (self.fsm.current_name == "Idle")
         self.stats.update_poise_regen(dt, is_idle)
+
+        # 韧性机制：眩晕结束时立即回满韧性
+        if self._was_stunned and not self.stunned:
+            # 眩晕刚结束 → 韧性回满
+            self.stats._poise.full_restore()
+        self._was_stunned = self.stunned
 
         # 状态异常每帧更新
         self.status.update(dt)

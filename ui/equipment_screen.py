@@ -13,6 +13,7 @@ import pygame
 from typing import Optional, TYPE_CHECKING
 
 from ui.font_manager import get_font
+from ui.base_widget import BaseWidget
 
 if TYPE_CHECKING:
     from entities.player.player import Player
@@ -79,7 +80,7 @@ ROLL_NAMES = {
 }
 
 
-class EquipmentScreen:
+class EquipmentScreen(BaseWidget):
     """
     装备界面。
 
@@ -97,6 +98,7 @@ class EquipmentScreen:
     """
 
     def __init__(self):
+        super().__init__(visible=False, z_index=50)
         self.is_open:    bool               = False
         self._player:    Optional["Player"] = None
         self._hover_slot: Optional[str]     = None
@@ -125,17 +127,20 @@ class EquipmentScreen:
 
     def toggle(self, player: "Player"):
         self.is_open = not self.is_open
+        self.visible = self.is_open
         if self.is_open:
             self._player    = player
             self._hover_slot = None
 
     def open(self, player: "Player"):
         self.is_open     = True
+        self.visible     = True
         self._player     = player
         self._hover_slot = None
 
     def close(self):
         self.is_open = False
+        self.visible = False
 
     # ----------------------------------------------------------------
     # 事件

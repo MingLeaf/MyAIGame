@@ -15,6 +15,7 @@ import pygame
 from typing import Optional, TYPE_CHECKING
 
 from ui.font_manager import get_font
+from ui.base_widget import BaseWidget
 from items.item_base import ItemType
 
 if TYPE_CHECKING:
@@ -60,7 +61,7 @@ _TYPE_COLOR = {
 }
 
 
-class InventoryScreen:
+class InventoryScreen(BaseWidget):
     """
     背包界面（覆盖层，不替换场景）。
     由 GameScene.handle_events 负责创建并传入事件；
@@ -86,6 +87,7 @@ class InventoryScreen:
     """
 
     def __init__(self):
+        super().__init__(visible=False, z_index=50)
         self.is_open:       bool            = False
         self._player:       Optional["Player"] = None
         self._hover_idx:    int             = -1   # 鼠标悬停格
@@ -116,6 +118,7 @@ class InventoryScreen:
     def toggle(self, player: "Player"):
         """切换背包开/关。"""
         self.is_open = not self.is_open
+        self.visible = self.is_open
         if self.is_open:
             self._player = player
             self._hover_idx    = -1
@@ -123,12 +126,14 @@ class InventoryScreen:
 
     def open(self, player: "Player"):
         self.is_open   = True
+        self.visible   = True
         self._player   = player
         self._hover_idx    = -1
         self._selected_idx = -1
 
     def close(self):
         self.is_open = False
+        self.visible = False
 
     # ----------------------------------------------------------------
     # 事件处理

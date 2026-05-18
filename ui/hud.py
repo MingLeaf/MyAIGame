@@ -7,6 +7,7 @@ import pygame
 
 from utils.color import COLOR_HP, COLOR_STAMINA, COLOR_MANA, UI_BG, WHITE
 from ui.font_manager import get_font
+from ui.base_widget import BaseWidget
 from config import SCREEN_WIDTH, SCREEN_HEIGHT
 
 if TYPE_CHECKING:
@@ -34,7 +35,7 @@ def _get_font():
     return _font
 
 
-class HUD:
+class HUD(BaseWidget):
     """
     玩家状态 HUD：
     - HP 条（红）
@@ -44,6 +45,7 @@ class HUD:
     """
 
     def __init__(self):
+        super().__init__(visible=True, z_index=40)
         self._hp_anim:       float = 1.0   # 血条动画平滑值（0~1）
         self._stamina_anim:  float = 1.0
         self._mana_anim:     float = 1.0
@@ -56,6 +58,8 @@ class HUD:
         self._mana_anim    += (player.stats.mana_ratio - self._mana_anim)   * min(1.0, speed * dt)
 
     def render(self, surface: pygame.Surface, player: "Player"):
+        if not self.visible:
+            return
         font = _get_font()
         bars = [
             ("HP",      self._hp_anim,      player.stats.hp_ratio,      COLOR_HP,      player.stats.hp,      player.stats.max_hp),

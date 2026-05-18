@@ -157,8 +157,12 @@ class PoisonEffect(StatusEffect):
     DEFAULT_DURATION = 30.0
     THRESHOLD        = 80.0       # 积累阈值，达到后才生效
 
-    def __init__(self, damage_per_sec: float = DAMAGE_PER_SEC,
-                 duration: float = DEFAULT_DURATION):
+    def __init__(self, damage_per_sec: float = None,
+                 duration: float = None):
+        if damage_per_sec is None:
+            damage_per_sec = self.DAMAGE_PER_SEC
+        if duration is None:
+            duration = self.DEFAULT_DURATION
         super().__init__(duration=duration)
         self.damage_per_sec = damage_per_sec
         self.accumulation: float = 0.0
@@ -213,8 +217,12 @@ class BurnEffect(StatusEffect):
     DEFENSE_PENALTY  = 3
     DEFAULT_DURATION = 8.0
 
-    def __init__(self, damage_per_sec: float = DAMAGE_PER_SEC,
-                 duration: float = DEFAULT_DURATION):
+    def __init__(self, damage_per_sec: float = None,
+                 duration: float = None):
+        if damage_per_sec is None:
+            damage_per_sec = self.DAMAGE_PER_SEC
+        if duration is None:
+            duration = self.DEFAULT_DURATION
         super().__init__(duration=duration)
         self.damage_per_sec    = damage_per_sec
         self._defense_applied  = False
@@ -275,7 +283,9 @@ class FreezeEffect(StatusEffect):
     DEFAULT_DURATION  = 2.0
     EXTRA_DMG_BONUS   = 0.20
 
-    def __init__(self, duration: float = DEFAULT_DURATION):
+    def __init__(self, duration: float = None):
+        if duration is None:
+            duration = self.DEFAULT_DURATION
         super().__init__(duration=duration)
 
     def apply(self, owner) -> None:
@@ -330,7 +340,9 @@ class StunEffect(StatusEffect):
     # 默认值，会被 _BALANCE["stun"] 覆盖
     DEFAULT_DURATION = 2.0
 
-    def __init__(self, duration: float = DEFAULT_DURATION):
+    def __init__(self, duration: float = None):
+        if duration is None:
+            duration = self.DEFAULT_DURATION
         super().__init__(duration=duration)
 
     def apply(self, owner) -> None:

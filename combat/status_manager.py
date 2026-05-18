@@ -60,10 +60,16 @@ class StatusManager:
 
         注意：BleedEffect 的积累值不会因此被重置；
         如需重置积累值请调用 reset_bleed_stack()。
+
+        特殊规则：stun（眩晕）状态已存在时不会刷新持续时间，
+        防止持续攻击导致无限眩晕。
         """
         name = effect.name
         if name in self._effects:
             existing = self._effects[name]
+            # 眩晕不可刷新：已处于眩晕时新眩晕无效
+            if name == "stun":
+                return
             # 刷新持续时间（永久状态 duration=-1 时此操作无实际效果）
             if existing.duration >= 0:
                 existing.elapsed  = 0.0

@@ -2,10 +2,10 @@
 # combat/poise_system.py —— 韧性 / 抗硬直系统
 #
 # 韧性规则（来自 game_rule.md）：
-#   - 韧性受到攻击时减少
+#   - 每次受击消耗韧性，同时重置恢复延迟
 #   - 韧性归零 → 触发硬直（眩晕），可被处决
-#   - 战斗中归零后有「恢复延迟」期，期间不回复
-#   - 延迟结束后慢速回复（战斗中）或立即回满（脱战）
+#   - 未受伤害 5 秒后开始恢复韧性
+#   - 眩晕结束后韧性立即回满
 #
 # 设计：
 #   将原本嵌入 EnemyStats 的韧性逻辑独立为 PoiseComponent，
@@ -17,8 +17,8 @@ from __future__ import annotations
 
 # 默认参数
 DEFAULT_MAX_POISE      = 30.0
-DEFAULT_REGEN_DELAY    = 2.0     # 韧性归零后恢复延迟（秒）
-DEFAULT_REGEN_RATE     = 8.0     # 战斗中每秒回复量
+DEFAULT_REGEN_DELAY    = 5.0     # 未受伤害后开始恢复的延迟（秒）
+DEFAULT_REGEN_RATE     = 10.0    # 战斗中每秒回复量
 INSTANT_RESTORE_IDLE   = True    # 脱战是否立即回满
 
 
@@ -34,6 +34,9 @@ class PoiseComponent:
 
         # 每帧
         self.poise.update(dt, is_idle=self.fsm.is_in("Idle"))
+
+        # 眩晕结束时
+        self.poise.full_restore()
     """
 
     def __init__(self,
@@ -52,14 +55,15 @@ class PoiseComponent:
 
     def consume(self, amount: float) -> bool:
         """
-        消耗韧性，返回 True 表示击破（归零）。
-        归零后启动恢复延迟。
+        消耗韧性。每次受击都重置恢复延迟。
+        返回 True 表示击破（归零）。
         """
         if amount <= 0 or self.max_poise <= 0:
             return False
         self.poise = max(0.0, self.poise - amount)
+        # 每次受击都重置恢复延迟（5秒不受击才开始恢复）
+        self._regen_timer = self.regen_delay
         if self.poise <= 0:
-            self._regen_timer = self.regen_delay
             return True
         return False
 
@@ -71,7 +75,7 @@ class PoiseComponent:
         if self.poise >= self.max_poise:
             return
 
-        # 韧性归零后的恢复延迟
+        # 恢复延迟倒计时（未受伤害 5 秒后才开始回复）
         if self._regen_timer > 0.0:
             self._regen_timer -= dt
             return
@@ -81,6 +85,11 @@ class PoiseComponent:
         else:
             self.poise = min(self.max_poise,
                              self.poise + self.regen_rate * dt)
+
+    def full_restore(self) -> None:
+        """眩晕结束后立即回满韧性。"""
+        self.poise = self.max_poise
+        self._regen_timer = 0.0
 
     def reset(self) -> None:
         """立即回满（如复活）。"""
@@ -106,6 +115,11 @@ class PoiseComponent:
     @property
     def is_broken(self) -> bool:
         return self.poise <= 0
+
+    @property
+    def is_recovering(self) -> bool:
+        """是否正在延迟等待中（未开始恢复）"""
+        return self._regen_timer > 0.0
 
     def __repr__(self) -> str:
         return (f"<PoiseComponent {self.poise:.1f}/{self.max_poise:.1f} "

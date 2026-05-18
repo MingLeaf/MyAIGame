@@ -2,11 +2,11 @@
 
 > 本文档记录已完成工作 + 拆分剩余开发任务为可复制到不同窗口的提示词。
 > 每段提示词都是「自包含」的：贴入新窗口即可让 AI 助手接续工作。
-> 最后更新：2026-05-15（第 11 阶段完成）
+> 最后更新：2026-05-18（第 12 阶段完成）
 
 ---
 
-## 一、当前工程状态总结（截至第 11 阶段完成）
+## 一、当前工程状态总结（截至第 12 阶段完成）
 
 ### 1.1 已完成阶段
 
@@ -23,6 +23,7 @@
 | 第 9 阶段 | Boss 系统（BaseBoss + 腐骨公爵 + 雾门 + 血条 + BossScene） | ✅ 完成 |
 | 第 10 阶段 | NPC 与对话系统（营地NPC/铁匠/商人/对话引擎） | ✅ 完成 |
 | 第 11 阶段 | 粒子特效与音频 + 商店系统 + 战斗修复 | ✅ 完成 |
+| 第 12 阶段 | UI 系统补全（BaseWidget/通知/属性面板/设置/主菜单UI/暂停UI/加载界面）| ✅ 完成 |
 
 ### 1.2 实际目录结构（已实现的关键模块）
 
@@ -65,8 +66,10 @@ systems/     loot_system (Stage7)
 ui/          font_manager / hud / inventory_screen / equipment_screen
              death_screen / campfire_menu / dialogue_box（NEW Stage10）
              boss_healthbar（NEW Stage9） / shop_screen（NEW Stage11）
+             base_widget / damage_number / notification / status_panel（NEW Stage12）
+             loading_screen / main_menu_ui / pause_menu_ui / settings_ui（NEW Stage12）
 scenes/      base_scene / main_menu_scene / game_scene / pause_scene
-             boss_scene（NEW Stage9）
+             boss_scene（NEW Stage9） / settings_scene（NEW Stage12）
 animation/   animation_clip / sprite_sheet_loader / animation_state_machine
              animator / particle_system（NEW Stage11）
 audio/       sfx_player / bgm_player / audio_manager（NEW Stage11）
@@ -550,7 +553,7 @@ data/
 
 ---
 
-### 窗口 5 · 第 9 阶段：Boss 系统
+### 窗口 5 · 第 9 阶段：Boss 系统 ✅ 已完成
 
 **本次任务**：实现 5 个 Boss + 完整 Boss 战体验（独立房间 / 两阶段 / 怒气值 / 灵核掉落）。
 
@@ -578,7 +581,7 @@ data/
 
 ---
 
-### 窗口 6 · 第 10 阶段：NPC 与对话系统
+### 窗口 6 · 第 10 阶段：NPC 与对话系统  ✅ 已完成
 
 **本次任务**：营地 NPC 可交互，对话树驱动剧情/服务。
 
@@ -638,7 +641,9 @@ data/
 
 ---
 
-### 窗口 8 · 第 12 阶段：UI 系统补全
+### 窗口 8 · 第 12 阶段：UI 系统补全 ✅ 已完成
+
+> 实施摘要见 §1.3.20。冒烟测试脚本：`_test_stage12_ui.py`
 
 **本次任务**：补齐所有 UI 界面，做到游戏全流程界面闭环。
 
@@ -800,7 +805,7 @@ data/
 
 窗口 6（NPC）依赖 4
 窗口 7（特效音频 + 商店）✅ 已完成 — 含 §1.3.19
-窗口 8（UI）依赖 4、5、6
+窗口 8（UI）✅ 已完成 — 含 §1.3.20
 窗口 9（场景串联）依赖 8
 窗口 10（存档）依赖 9
 窗口 11（地图内容）可在 1~10 任意时间并行制作
@@ -1074,7 +1079,72 @@ particle.texture = my_surface             # 单颗粒子级别
 | `_test_stage8_regression.py` | 24 项回归 | **零破坏** |
 | `_test_stage9_boss.py` | 11 组 Boss 测试 | **零破坏** |
 
+### 1.3.20 第 12 阶段实施摘要（UI 系统补全）
 
+#### 12.0 新建文件清单
+
+| # | 文件 | 说明 |
+|---|------|------|
+| 1 | `ui/base_widget.py` | `BaseWidget` — UI 控件基类（rect/visible/z_index/handle_event/update/render/is_hover） |
+| 2 | `ui/damage_number.py` | `FloatingText` + `FloatingTextManager` — 从 `combat/floating_text.py` 迁移，扩充按伤害类型着色（火/冰/毒/流血/神圣/暴击） |
+| 3 | `ui/notification.py` | `NotificationManager` — 浮动提示系统（区域名渐显/Boss 震动/物品拾取右下堆叠） |
+| 4 | `ui/status_panel.py` | `StatusPanel` — 人物属性面板（六项成长属性+战斗衍生+装备概览+状态异常显示，Tab 键打开） |
+| 5 | `ui/loading_screen.py` | `LoadingScreen` — 加载界面（进度条+区域名称+世界观随机提示） |
+| 6 | `ui/main_menu_ui.py` | `MainMenuUI` — 主菜单 UI（标题渐显浮动+粒子背景+4 按钮） |
+| 7 | `ui/pause_menu_ui.py` | `PauseMenuUI` — 暂停菜单 UI（半透明遮罩+4 按钮） |
+| 8 | `ui/settings_ui.py` | `SettingsUI` — 设置界面（音量滑块/BGM-SFX/键位重映射/分辨率/全屏） |
+| 9 | `scenes/settings_scene.py` | `SettingsScene` — 设置场景（由暂停菜单/主菜单 push） |
+
+#### 12.1 改造文件清单
+
+| 文件 | 变更 |
+|------|------|
+| `ui/hud.py` | `HUD(BaseWidget)` — 继承 BaseWidget |
+| `ui/inventory_screen.py` | `InventoryScreen(BaseWidget)` — 继承 BaseWidget，`visible` 与 `is_open` 联动 |
+| `ui/equipment_screen.py` | `EquipmentScreen(BaseWidget)` — 继承 BaseWidget，`visible` 与 `is_open` 联动 |
+| `combat/floating_text.py` | 改为兼容包装，所有符号 re-export 自 `ui.damage_number` |
+| `ui/__init__.py` | 导出全部新 UI 模块 |
+| `scenes/main_menu_scene.py` | 重写：委托 `MainMenuUI` 处理渲染+输入，新增"设置"和"继续游戏"按钮 |
+| `scenes/pause_scene.py` | 重写：委托 `PauseMenuUI` 处理，新增"设置"按钮 |
+| `scenes/game_scene.py` | 集成 `StatusPanel`（Tab 键）+ `NotificationManager`（区域名/拾取通知），更新键位提示 |
+
+#### 12.2 BaseWidget 统一基类
+
+**接口约定**：
+```
+BaseWidget(rect, visible, z_index)
+  ├── show() / hide() / toggle()           # 可见性
+  ├── handle_event(event) → bool           # 事件分发（默认返回 False）
+  ├── update(dt)                           # 每帧更新（默认空实现）
+  ├── render(surface)                      # 渲染（默认空实现）
+  └── is_hover(mx, my) → bool             # 鼠标悬停检测
+```
+
+**继承关系**：`HUD` / `InventoryScreen` / `EquipmentScreen` / `StatusPanel` / `NotificationManager` 全部继承自 `BaseWidget`。
+
+#### 12.3 通知系统（NotificationManager）
+
+**4 种预设类型**：
+| 类型 | 触发时机 | 效果 |
+|------|----------|------|
+| `area_name` | 区域加载完成 | 48px 金色大字渐显 1.0s → 停 0.5s → 渐隐 1.5s |
+| `boss_appear` | Boss 雾门触发 | 44px 红色大字 + 震动效果 |
+| `item_pickup` | 拾取物品 | 16px 右下角堆叠（最多 5 条），2.0s 渐隐 |
+| `souls` | 灵魂变化 | 20px 绿色右下角 |
+
+#### 12.4 设置界面（SettingsUI）
+
+**功能**：
+- 音量：主音量/BGM/SFX 三滑块（← → 调整 5%）
+- 画面：全屏开关 + 4 档分辨率
+- 键位：Enter 重映射 → 按下新键 → `input_handler.remap()`，Backspace 恢复默认
+- 即时生效，ESC 返回
+
+#### 12.5 测试覆盖
+
+| 测试 | 覆盖项 | 结果 |
+|------|--------|------|
+| `_test_stage12_ui.py` | BaseWidget 创建/继承、飘字迁移、通知系统、状态面板、加载/主菜单/暂停/设置 UI、兼容导入、GameScene 集成 | **10/10** |
 
 ---
 

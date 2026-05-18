@@ -222,6 +222,13 @@ class PlayerStats:
         # 移除同类型旧 buff（不叠加，取最大值逻辑简化）
         self._active_buffs = [b for b in self._active_buffs if b["type"] != buff_type]
 
+        # 武器附魔互斥：新附魔移除旧附魔（火焰<->神圣互斥）
+        if buff_type in ("weapon_fire", "weapon_holy"):
+            self._active_buffs = [
+                b for b in self._active_buffs
+                if b["type"] not in ("weapon_fire", "weapon_holy")
+            ]
+
         buf = {"type": buff_type, "value": value, "duration": duration, "remaining": duration}
         self._active_buffs.append(buf)
         self._recalc_buffs()
@@ -255,7 +262,26 @@ class PlayerStats:
                 self._buff_atk_pct += v
             elif t == "def_bonus":
                 self._buff_def_pct += v
-            # weapon_fire / weapon_holy 由 HitResolver 的 element 字段处理
+            elif t == "def_down_0_20":
+                self._buff_def_pct += v   # 负值降低防御
+            # weapon_fire / weapon_holy 由 get_weapon_element_override() 返回
 
         self.atk_bonus_pct += self._buff_atk_pct
         self.def_bonus_pct += self._buff_def_pct
+
+    def get_weapon_element_override(self) -> str:
+        """
+        查询活跃 Buff 中是否有武器附魔（weapon_fire / weapon_holy）。
+        有则返回覆盖后的元素字符串（如 "fire"/"holy"），无则返回空字符串 ""。
+
+        多个附魔同时存在取第一个（武器只能附一种元素）。
+        """
+        if not hasattr(self, "_active_buffs") or not self._active_buffs:
+            return ""
+        for buf in self._active_buffs:
+            t = buf.get("type", "")
+            if t == "weapon_fire":
+                return "fire"
+            if t == "weapon_holy":
+                return "holy"
+        return ""
